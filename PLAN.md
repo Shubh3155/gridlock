@@ -365,6 +365,8 @@ gridlock/
 ├── backend/
 │   ├── main.py
 │   ├── firebase_utils.py
+│   ├── dataset/
+│   │   └── jan to may police.csv
 │   └── requirements.txt
 ├── pipeline/
 │   ├── clean.py
@@ -376,10 +378,6 @@ gridlock/
 │   ├── map.js
 │   ├── charts.js
 │   └── firebase-messaging-sw.js   ← served at root by FastAPI
-├── data/
-│   ├── violations_raw.csv
-│   ├── violations_clean.csv
-│   └── zones.geojson
 ├── serviceAccountKey.json         ← gitignored
 └── .env                           ← GEMINI_API_KEY, FCM config
 ```
