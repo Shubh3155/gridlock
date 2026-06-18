@@ -1,4 +1,7 @@
 # Gridlock Hackathon 2.0 — Remaining Plan
+## (Model trained ✅ — what to do next)
+
+---
 
 ## Current Status
 
@@ -8,32 +11,39 @@
 | DBSCAN clustering | ✅ Done |
 | XGBoost violation likelihood model | ✅ Done |
 | Model evaluation (R² = 0.90, RMSE = 0.0763) | ✅ Done |
-| Firebase Admin setup + service account key | ✅ Done |
-| FastAPI backend | 🔲 Todo |
+| FastAPI backend | ✅ Done |
 | Next.js frontend | 🔲 Todo |
-| Firebase Auth + FCM browser push | 🔲 Todo |
+| Firebase Auth (backend JWT verify + sessions) | ✅ Done |
+| FCM browser push (frontend integration) | 🔲 Todo |
 | Gemini enforcement brief | 🔲 Todo |
 | Deployment | 🔲 Todo |
 
 ---
 
-## Phase 1 — Model Export (1 hour)
+## Phase 1 — Model Finalization (1–2 hours)
 
-Before building the backend, export everything the API will need.
+Before wiring into the backend, finish two things that are demo/judge-critical.
 
-### 1A. SHAP Summary Chart
+### 1A. SHAP Explainability
 
 ```python
-import shap, matplotlib.pyplot as plt
+import shap
+import matplotlib.pyplot as plt
 
 explainer = shap.TreeExplainer(model)
 shap_values = explainer.shap_values(X_test)
+
+# Summary plot — save as image for frontend
 shap.summary_plot(shap_values, X_test, show=False)
 plt.tight_layout()
-plt.savefig("backend/static/shap_summary.png", dpi=150)
+plt.savefig("static/shap_summary.png", dpi=150)
 ```
 
-### 1B. Confidence Tiers on Zone Data
+Put this chart on the dashboard. Judges will ask "why does your model predict high risk here?" — SHAP answers it visually.
+
+### 1B. Confidence Tiers
+
+Bucket raw predictions into three actionable tiers:
 
 ```python
 df['risk_tier'] = pd.cut(
@@ -43,60 +53,37 @@ df['risk_tier'] = pd.cut(
 )
 ```
 
+These tiers drive map colors (green / orange / red) and the enforcement priority list.
+
 ### 1C. Prediction Grid Export
 
+Generate a prediction grid over the full bounding box for the heatmap layer:
+
 ```python
-import numpy as np, json
+import numpy as np
+import json
 
 lat_range = np.linspace(df.latitude.min(), df.latitude.max(), 100)
 lng_range = np.linspace(df.longitude.min(), df.longitude.max(), 100)
 
-grid = []
+grid_points = []
 for lat in lat_range:
     for lng in lng_range:
         features = build_features(lat, lng, hour=8, day_of_week=1)
         score = float(model.predict([features])[0])
-        grid.append({"lat": lat, "lng": lng, "score": score})
+        grid_points.append({"lat": lat, "lng": lng, "score": score})
 
-with open("backend/static/prediction_grid.json", "w") as f:
-    json.dump(grid, f)
+with open("static/prediction_grid.json", "w") as f:
+    json.dump(grid_points, f)
 ```
 
-### 1D. Save Zones as GeoJSON
-
-```python
-import geopandas as gpd
-from shapely.geometry import Point, MultiPoint
-
-zones = []
-for cluster_id in df[df.cluster != -1].cluster.unique():
-    cluster_df = df[df.cluster == cluster_id]
-    hull = MultiPoint(cluster_df[['longitude','latitude']].values.tolist()).convex_hull
-    zones.append({
-        "type": "Feature",
-        "geometry": hull.__geo_interface__,
-        "properties": {
-            "zone_id": str(cluster_id),
-            "priority_score": round(float(cluster_df.priority_score.mean()), 2),
-            "violation_count": len(cluster_df),
-            "risk_tier": cluster_df.risk_tier.mode()[0],
-            "top_violations": cluster_df.violation_type.value_counts().head(3).index.tolist(),
-            "peak_hour": int(cluster_df.hour_of_day.mode()[0]),
-            "police_station": cluster_df.police_station.mode()[0],
-            "center_lat": float(cluster_df.latitude.mean()),
-            "center_lng": float(cluster_df.longitude.mean()),
-        }
-    })
-
-with open("backend/static/zones.geojson", "w") as f:
-    json.dump({"type": "FeatureCollection", "features": zones}, f)
-```
+Expose this as a FastAPI endpoint so the frontend can toggle between historical heatmap and predicted heatmap.
 
 ### Deliverables
-- `backend/static/shap_summary.png`
-- `backend/static/prediction_grid.json`
-- `backend/static/zones.geojson`
-- `backend/models/violation_likelihood.pkl`
+- `pipeline/model_export.py` — runs SHAP + grid export
+- `models/violation_likelihood.pkl` — saved model
+- `static/prediction_grid.json` — precomputed grid
+- `static/shap_summary.png` — explainability chart
 
 ---
 
@@ -108,42 +95,35 @@ with open("backend/static/zones.geojson", "w") as f:
 backend/
 ├── main.py
 ├── firebase_utils.py
+├── cluster_utils.py
 ├── model_utils.py
 ├── requirements.txt
-├── serviceAccountKey.json     ← gitignored
-├── models/
-│   └── violation_likelihood.pkl
-└── static/
-    ├── zones.geojson
-    ├── prediction_grid.json
-    └── shap_summary.png
+└── models/
+    └── violation_likelihood.pkl
 ```
 
-### `requirements.txt`
+### Routes
 
-```
-fastapi
-uvicorn
-firebase-admin
-xgboost
-joblib
-pandas
-numpy
-scikit-learn
-google-generativeai
-python-dotenv
-```
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/api/zones` | Public | All DBSCAN zones as GeoJSON with priority scores |
+| GET | `/api/zones/{zone_id}` | Public | Single zone detail + AI brief |
+| GET | `/api/heatmap/historical` | Public | Raw violation points for heatmap |
+| GET | `/api/heatmap/predicted` | Public | Precomputed prediction grid |
+| GET | `/api/stats` | Public | Dashboard summary (total violations, top station, peak hour) |
+| POST | `/api/predict` | Public | Predict likelihood for a given lat/lng/hour/day |
+| POST | `/api/register-fcm-token` | 🔒 JWT | Store FCM token for logged-in user |
+| POST | `/api/run-pipeline` | 🔒 Admin | Re-run clustering + model inference on new data |
 
-### `firebase_utils.py`
+### Auth Middleware
 
 ```python
 import firebase_admin
-from firebase_admin import auth, credentials, firestore, messaging
+from firebase_admin import auth, credentials
 from fastapi import Header, HTTPException
 
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
-db = firestore.client()
 
 async def verify_token(authorization: str = Header(...)):
     try:
@@ -151,9 +131,38 @@ async def verify_token(authorization: str = Header(...)):
         decoded = auth.verify_id_token(token)
         return decoded
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid token")
+```
 
-def get_enforcer_tokens() -> list[str]:
+### Model Inference Endpoint
+
+```python
+import joblib
+import numpy as np
+
+model = joblib.load("models/violation_likelihood.pkl")
+
+@app.post("/api/predict")
+async def predict_likelihood(body: dict):
+    features = build_features(
+        lat=body["lat"],
+        lng=body["lng"],
+        hour=body["hour"],
+        day_of_week=body["day_of_week"]
+    )
+    score = float(model.predict([features])[0])
+    tier = "High" if score > 0.65 else "Medium" if score > 0.35 else "Low"
+    return {"likelihood_score": score, "risk_tier": tier}
+```
+
+### FCM Push on High-Score Zone Detection
+
+```python
+from firebase_admin import messaging, firestore
+
+db = firestore.client()
+
+def get_enforcer_tokens():
     users = db.collection("users").where("role", "==", "enforcer").stream()
     return [u.to_dict().get("fcm_token") for u in users if u.to_dict().get("fcm_token")]
 
@@ -173,156 +182,42 @@ def push_hotspot_alert(zone_name: str, score: float, zone_id: str):
     )
 ```
 
-### `model_utils.py`
+### CORS (required for Next.js dev)
 
 ```python
-import joblib, json
-import numpy as np
-
-model = joblib.load("models/violation_likelihood.pkl")
-
-with open("static/zones.geojson") as f:
-    zones_geojson = json.load(f)
-
-with open("static/prediction_grid.json") as f:
-    prediction_grid = json.load(f)
-
-def build_features(lat, lng, hour, day_of_week):
-    # Replicate the same feature engineering from training
-    is_peak = 1 if hour in range(7, 10) or hour in range(17, 20) else 0
-    return [lat, lng, hour, day_of_week, is_peak, 0, 0, 0]
-    # Add remaining features to match training columns exactly
-```
-
-### `main.py`
-
-```python
-from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from firebase_utils import verify_token, db, push_hotspot_alert
-from model_utils import model, zones_geojson, prediction_grid, build_features
-import google.generativeai as genai
-import os
-
-app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://your-vercel-domain.vercel.app"],
+    allow_origins=["http://localhost:3000", "https://your-prod-domain.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-# ── Public routes ──────────────────────────────────────────
-
-@app.get("/api/zones")
-async def get_zones():
-    return JSONResponse(zones_geojson)
-
-@app.get("/api/zones/{zone_id}")
-async def get_zone(zone_id: str):
-    zone = next(
-        (f for f in zones_geojson["features"] if f["properties"]["zone_id"] == zone_id),
-        None
-    )
-    if not zone:
-        return JSONResponse({"error": "Zone not found"}, status_code=404)
-
-    props = zone["properties"]
-
-    # Check Firestore cache first
-    doc = db.collection("zones").document(zone_id).get()
-    if doc.exists and doc.to_dict().get("enforcement_brief"):
-        props["enforcement_brief"] = doc.to_dict()["enforcement_brief"]
-    else:
-        brief = generate_brief(props)
-        props["enforcement_brief"] = brief
-        db.collection("zones").document(zone_id).set(
-            {"enforcement_brief": brief}, merge=True
-        )
-
-    return JSONResponse(zone)
-
-@app.get("/api/heatmap/historical")
-async def historical_heatmap():
-    # Return raw violation lat/lng points
-    import pandas as pd
-    df = pd.read_csv("static/violations_clean.csv")
-    points = df[["latitude", "longitude"]].dropna().values.tolist()
-    return {"points": points}
-
-@app.get("/api/heatmap/predicted")
-async def predicted_heatmap():
-    return {"points": prediction_grid}
-
-@app.get("/api/stats")
-async def get_stats():
-    features = [f["properties"] for f in zones_geojson["features"]]
-    return {
-        "total_zones": len(features),
-        "high_risk_zones": sum(1 for f in features if f["risk_tier"] == "High"),
-        "total_violations": sum(f["violation_count"] for f in features),
-        "top_station": max(features, key=lambda x: x["violation_count"])["police_station"],
-    }
-
-@app.post("/api/predict")
-async def predict(body: dict):
-    features = build_features(
-        lat=body["lat"], lng=body["lng"],
-        hour=body["hour"], day_of_week=body["day_of_week"]
-    )
-    score = float(model.predict([features])[0])
-    tier = "High" if score > 0.65 else "Medium" if score > 0.35 else "Low"
-    return {"likelihood_score": round(score, 4), "risk_tier": tier}
-
-# ── Protected routes ───────────────────────────────────────
-
-@app.post("/api/register-fcm-token")
-async def register_token(body: dict, user=Depends(verify_token)):
-    db.collection("users").document(user["uid"]).set(
-        {"email": user["email"], "fcm_token": body["fcm_token"], "role": "enforcer"},
-        merge=True
-    )
-    return {"status": "ok"}
-
-# ── Static ─────────────────────────────────────────────────
-
-@app.get("/static/shap_summary.png")
-async def shap_image():
-    return FileResponse("static/shap_summary.png")
-
-# ── Helpers ────────────────────────────────────────────────
-
-def generate_brief(props: dict) -> str:
-    prompt = f"""
-    You are a traffic enforcement analyst. Write a 2-line patrol recommendation.
-    Be specific and actionable. No preamble.
-
-    Location: {props.get('police_station', 'Unknown')}
-    Violations (last 30 days): {props['violation_count']}
-    Top types: {', '.join(props['top_violations'])}
-    Peak hour: {props['peak_hour']}:00
-    Risk score: {props['priority_score']}/10
-    Risk tier: {props['risk_tier']}
-    """
-    response = genai.GenerativeModel("gemini-pro").generate_content(prompt)
-    return response.text
 ```
+
+### Service Worker Route (FCM requirement)
+
+```python
+from fastapi.responses import FileResponse
+
+@app.get("/firebase-messaging-sw.js")
+async def serve_sw():
+    return FileResponse("frontend/public/firebase-messaging-sw.js")
+```
+
+> ⚠️ The service worker **must** be served from the root path. In Next.js, place it in `/public/firebase-messaging-sw.js` — Next.js serves `/public` at root automatically, so FastAPI doesn't need to serve it in production.
 
 ---
 
 ## Phase 3 — Next.js Frontend (4–5 hours)
 
-### Setup
+### Project Setup
 
 ```bash
 npx create-next-app@latest frontend --typescript --tailwind --app
 cd frontend
-npm install firebase leaflet react-leaflet chart.js react-chartjs-2
+npm install firebase leaflet react-leaflet leaflet.heat chart.js react-chartjs-2
 npm install @types/leaflet
 ```
 
@@ -332,51 +227,54 @@ npm install @types/leaflet
 frontend/
 ├── app/
 │   ├── layout.tsx
-│   └── page.tsx
+│   ├── page.tsx               ← dashboard (map + panels)
+│   └── api/                   ← Next.js API routes (optional proxies)
 ├── components/
-│   ├── Map.tsx                ← dynamic import, no SSR
-│   ├── ZoneLayer.tsx          ← colored polygons per risk tier
-│   ├── HeatmapLayer.tsx       ← Leaflet.heat wrapper
-│   ├── ZoneDetailPanel.tsx    ← slides in on zone click
-│   ├── TopZonesList.tsx       ← ranked list sidebar
-│   ├── StatsBar.tsx           ← summary numbers
-│   ├── Charts.tsx             ← hourly trend + pie chart
-│   ├── Navbar.tsx             ← logo + login button
-│   └── Toast.tsx              ← foreground FCM toast
+│   ├── Map.tsx                ← Leaflet map, dynamic import (no SSR)
+│   ├── HeatmapLayer.tsx       ← Leaflet.heat integration
+│   ├── ZoneLayer.tsx          ← DBSCAN zone polygons, color-coded
+│   ├── ZoneDetailPanel.tsx    ← right panel on zone click
+│   ├── TopZonesList.tsx       ← ranked enforcement list
+│   ├── StatsBar.tsx           ← summary numbers top bar
+│   ├── Charts.tsx             ← hourly trend + violation type pie
+│   ├── Navbar.tsx             ← logo + auth status + notification bell
+│   └── Toast.tsx              ← foreground FCM notification toast
 ├── lib/
-│   ├── firebase.ts
-│   ├── api.ts
-│   └── types.ts
+│   ├── firebase.ts            ← firebase init + auth + FCM
+│   ├── api.ts                 ← typed fetch wrappers for FastAPI
+│   └── types.ts               ← Zone, Violation, PredictionPoint types
 └── public/
-    └── firebase-messaging-sw.js   ← served at root automatically
+    └── firebase-messaging-sw.js   ← FCM service worker (served at root)
 ```
 
-### Critical: Map must be dynamically imported
+### Key Implementation Notes
+
+#### Map must be dynamically imported (no SSR)
+
+Leaflet breaks on server-side render. Always:
 
 ```tsx
 // app/page.tsx
 import dynamic from 'next/dynamic'
+
 const Map = dynamic(() => import('@/components/Map'), { ssr: false })
 ```
 
-Leaflet accesses `window` on import — it will crash Next.js SSR without this.
-
-### `lib/firebase.ts`
+#### Firebase init (`lib/firebase.ts`)
 
 ```typescript
-import { initializeApp, getApps } from 'firebase/app'
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
+import { initializeApp } from 'firebase/app'
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { getMessaging, getToken, onMessage } from 'firebase/messaging'
 
-const firebaseConfig = {
+const app = initializeApp({
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-}
+})
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
 export const auth = getAuth(app)
 
 export async function loginWithGoogle() {
@@ -385,15 +283,12 @@ export async function loginWithGoogle() {
   return { user, idToken }
 }
 
-export async function logout() {
-  await signOut(auth)
-}
-
 export async function registerFCMToken(idToken: string) {
+  // Only runs in browser
   if (typeof window === 'undefined') return
   const messaging = getMessaging(app)
   const permission = await Notification.requestPermission()
-  if (permission !== 'granted') return null
+  if (permission !== 'granted') return
 
   const fcmToken = await getToken(messaging, {
     vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
@@ -407,8 +302,6 @@ export async function registerFCMToken(idToken: string) {
     },
     body: JSON.stringify({ fcm_token: fcmToken })
   })
-
-  return fcmToken
 }
 
 export function onForegroundMessage(callback: (payload: any) => void) {
@@ -418,19 +311,19 @@ export function onForegroundMessage(callback: (payload: any) => void) {
 }
 ```
 
-### `public/firebase-messaging-sw.js`
+#### Service Worker (`public/firebase-messaging-sw.js`)
 
 ```javascript
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js')
 
-// Hardcode config — process.env does NOT work in service workers
 firebase.initializeApp({
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  messagingSenderId: "...",
+  appId: "..."
+  // Hardcode here — env vars are not available in service workers
 })
 
 const messaging = firebase.messaging()
@@ -449,7 +342,57 @@ self.addEventListener('notificationclick', (event) => {
 })
 ```
 
-### `.env.local`
+> ⚠️ Firebase config must be hardcoded in the service worker. `process.env` does not work inside service workers.
+
+#### Dashboard Layout (`app/page.tsx`)
+
+```tsx
+export default function Dashboard() {
+  return (
+    <div className="flex flex-col h-screen bg-black text-white">
+      <Navbar />
+      <StatsBar />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 relative">
+          <Map />                    {/* Leaflet map, fills left panel */}
+        </div>
+        <div className="w-80 flex flex-col border-l border-zinc-800 overflow-y-auto">
+          <TopZonesList />           {/* ranked enforcement zones */}
+          <Charts />                 {/* hourly trend + violation pie */}
+        </div>
+      </div>
+      <Toast />                      {/* foreground FCM notification */}
+    </div>
+  )
+}
+```
+
+#### Map Layers Toggle
+
+Two layers on the map, toggled by a button:
+
+```tsx
+const [layer, setLayer] = useState<'historical' | 'predicted'>('historical')
+
+// historical → fetch /api/heatmap/historical → Leaflet.heat
+// predicted  → fetch /api/heatmap/predicted  → Leaflet.heat on prediction grid
+```
+
+This is the demo's visual centrepiece — switching from "where violations happened" to "where violations will happen."
+
+#### Zone Click → Detail Panel
+
+```tsx
+// ZoneDetailPanel.tsx
+// Shows on zone polygon click:
+// - violation count + breakdown
+// - risk tier badge (High / Medium / Low)
+// - peak hour
+// - AI enforcement brief (fetched from /api/zones/{id})
+// - SHAP summary image
+```
+
+### Environment Variables (`.env.local`)
 
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY=
@@ -461,85 +404,102 @@ NEXT_PUBLIC_FIREBASE_VAPID_KEY=
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-### Dashboard Layout
+---
 
+## Phase 4 — Gemini Enforcement Brief (1 hour)
+
+Called server-side in FastAPI when `/api/zones/{zone_id}` is hit.
+
+```python
+import google.generativeai as genai
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+def generate_enforcement_brief(zone: dict) -> str:
+    prompt = f"""
+    You are a traffic enforcement analyst. Write a 2-line patrol recommendation.
+    Be specific and actionable. No preamble.
+
+    Location: {zone['location']}
+    Violations (last 30 days): {zone['violation_count']}
+    Top types: {', '.join(zone['top_violations'])}
+    Peak hour: {zone['peak_hour']}
+    Risk score: {zone['priority_score']:.2f}/10
+    Risk tier: {zone['risk_tier']}
+    """
+    response = genai.GenerativeModel("gemini-pro").generate_content(prompt)
+    return response.text
 ```
-┌──────────────────────────────────────────────────────────┐
-│  NAVBAR: Logo | Stats pills | Login button               │
-├──────────────────┬───────────────────────────────────────┤
-│                  │  TOP ENFORCEMENT ZONES (ranked)       │
-│  LEAFLET MAP     │  ───────────────────────────────────  │
-│                  │  🔴 Zone 4 · Score 8.4 · 23 cases    │
-│  Toggle buttons: │  🟠 Zone 7 · Score 6.1 · 14 cases    │
-│  [Historical]    │  🟡 Zone 2 · Score 4.2 · 9 cases     │
-│  [Predicted]     │  ───────────────────────────────────  │
-│                  │  VIOLATION TYPE BREAKDOWN (pie)       │
-│  Click zone →    │  ───────────────────────────────────  │
-│  detail panel    │  HOURLY TREND (bar chart)             │
-└──────────────────┴───────────────────────────────────────┘
+
+Cache the result in Firestore so it's not regenerated on every click:
+
+```python
+# Write to Firestore on first generation
+db.collection("zones").document(zone_id).set(
+    {"enforcement_brief": brief, "brief_generated_at": firestore.SERVER_TIMESTAMP},
+    merge=True
+)
 ```
-
-### Zone Detail Panel (on click)
-
-Shows:
-- Zone name + risk tier badge (color-coded)
-- Violation count + top types
-- Peak hour
-- AI enforcement brief (from `/api/zones/{id}`)
-- SHAP summary image (from `/static/shap_summary.png`)
 
 ---
 
-## Phase 4 — Deployment (1 hour)
+## Phase 5 — Deployment (1 hour)
 
-### Backend → Render
+### Backend (Render)
 
-1. Push `backend/` to GitHub (ensure `serviceAccountKey.json` is gitignored)
-2. On Render: New Web Service → connect repo → set:
-   - Build: `pip install -r requirements.txt`
-   - Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-3. Add env vars: `GEMINI_API_KEY` + Firebase service account as base64:
-   ```bash
-   base64 -i serviceAccountKey.json | pbcopy  # copy to clipboard
-   ```
-   Then decode in `firebase_utils.py`:
-   ```python
-   import base64, json, tempfile, os
+```yaml
+# render.yaml
+services:
+  - type: web
+    name: gridlock-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+```
 
-   if os.getenv("FIREBASE_SERVICE_ACCOUNT_B64"):
-       decoded = base64.b64decode(os.getenv("FIREBASE_SERVICE_ACCOUNT_B64"))
-       with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode='wb') as f:
-           f.write(decoded)
-           cred = credentials.Certificate(f.name)
-   else:
-       cred = credentials.Certificate("serviceAccountKey.json")
-   ```
+Add `serviceAccountKey.json` content as a Render environment variable (base64 encoded).
 
-### Frontend → Vercel
+### Frontend (Vercel)
 
 ```bash
 cd frontend
 vercel --prod
 ```
 
-Set all `NEXT_PUBLIC_*` env vars in Vercel dashboard. Update `NEXT_PUBLIC_API_URL` to the Render URL.
+Set all `NEXT_PUBLIC_*` env vars in Vercel dashboard. Update `NEXT_PUBLIC_API_URL` to the Render backend URL.
+
+---
+
+## Demo Flow (Judges)
+
+```
+1. Open webapp → brutalist black/white dashboard loads
+2. Google login → "Allow notifications?" browser prompt       ← impressive
+3. Map shows historical violation heatmap (Bengaluru)
+4. Toggle → predicted likelihood heatmap appears              ← wow moment
+5. Click red high-risk zone → detail panel slides in:
+   - violation breakdown
+   - risk tier badge
+   - AI patrol brief                                          ← differentiator
+6. Admin triggers pipeline rerun → high-score zone found
+7. Browser push notification fires (works in background)      ← very impressive
+8. Click notification → app focuses, highlights that zone
+```
 
 ---
 
 ## Remaining Timeline
 
-| Block | Task | Est. Time |
-|---|---|---|
-| Now | Phase 1: SHAP + tiers + grid + GeoJSON export | 1 hr |
-| Next | Phase 2: FastAPI all routes wired + tested | 3–4 hrs |
-| Next | Phase 3: Next.js scaffold + map + auth + FCM | 4–5 hrs |
-| Next | Gemini brief endpoint + Firestore cache | 1 hr |
-| Final | Deploy Render + Vercel + smoke test | 1 hr |
-
-**Deadline: June 21 — ~3 days remaining.**
+| Time | Task |
+|---|---|
+| Next 1–2 hrs | Phase 1: SHAP + confidence tiers + prediction grid export |
+| Next 3–4 hrs | Phase 2: FastAPI all routes + FCM push wired |
+| Next 4–5 hrs | Phase 3: Next.js dashboard + map + Firebase Auth + FCM |
+| Next 1 hr | Phase 4: Gemini brief endpoint + Firestore cache |
+| Final 1 hr | Phase 5: Deploy to Render + Vercel, smoke test end-to-end |
 
 ---
 
-## Pitch Line
+## Pitch Line (one sentence)
 
 > *"Our system doesn't just show where violations happened — it predicts where they'll happen next with 90% accuracy, enabling pre-emptive patrol deployment rather than reactive enforcement."*
