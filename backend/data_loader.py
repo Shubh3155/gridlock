@@ -20,14 +20,11 @@ _stats: dict | None = None
 _historical_heatmap: list | None = None
 
 
-def _load_zones():
-    """Parse zones.geojson into memory."""
+def _load_zones_local_fallback():
+    """Parse local zones.geojson into memory as fallback."""
     global _zones_geojson, _zones_by_id
-    if _zones_geojson is not None:
-        return
-
     if not os.path.exists(_ZONES_PATH):
-        print(f"WARNING: zones.geojson not found at {_ZONES_PATH}")
+        print(f"WARNING: Fallback zones.geojson not found at {_ZONES_PATH}")
         _zones_geojson = {"type": "FeatureCollection", "features": []}
         _zones_by_id = {}
         return
@@ -40,6 +37,51 @@ def _load_zones():
         zone_id = feature.get("properties", {}).get("zone_id")
         if zone_id:
             _zones_by_id[zone_id] = feature
+
+
+def _load_zones():
+    """Load zones from Firestore with local zones.geojson fallback."""
+    global _zones_geojson, _zones_by_id
+    if _zones_geojson is not None:
+        return
+
+    print("[DataLoader] Querying zones from Firestore cloud database...")
+    try:
+        from firebase_utils import get_firestore_client
+        db = get_firestore_client()
+        
+        # Stream zones collection documents
+        docs = db.collection("zones").stream()
+        
+        import json
+        features = []
+        _zones_by_id = {}
+        for doc in docs:
+            feature = doc.to_dict()
+            if "geometry" in feature and isinstance(feature["geometry"], str):
+                try:
+                    feature["geometry"] = json.loads(feature["geometry"])
+                except Exception as ex:
+                    print(f"[DataLoader] Failed to deserialize geometry for doc {doc.id}: {ex}")
+            features.append(feature)
+            zone_id = feature.get("properties", {}).get("zone_id")
+            if zone_id:
+                _zones_by_id[zone_id] = feature
+
+        # If Firestore collection is empty/failed, use fallback
+        if not features:
+            print("[DataLoader] Firestore zones collection is empty. Falling back to local disk.")
+            _load_zones_local_fallback()
+            return
+            
+        _zones_geojson = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        print(f"[DataLoader] Successfully loaded {len(features)} zones from Firestore.")
+    except Exception as e:
+        print(f"[DataLoader] WARNING: Firestore load failed ({str(e)}). Falling back to local disk.")
+        _load_zones_local_fallback()
 
 
 def _load_csv_data():

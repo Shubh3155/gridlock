@@ -8,14 +8,14 @@ interface SidebarProps {
   user: UserSession | null;
   activeTab: string;
   onTabChange: (tab: string) => void;
-  onTriggerScan: () => void;
+  onSendAlert: () => void;
 }
 
 export default function Sidebar({
   user,
   activeTab,
   onTabChange,
-  onTriggerScan,
+  onSendAlert,
 }: SidebarProps) {
   const navItems = [
     { id: "assets", label: "ASSETS", icon: "visibility" },
@@ -78,10 +78,10 @@ export default function Sidebar({
       {/* Bottom Actions */}
       <div className="px-6 mt-auto pt-6 border-t border-outline-variant/30">
         <button
-          onClick={onTriggerScan}
+          onClick={onSendAlert}
           className="w-full py-3 mb-4 bg-transparent border border-primary-fixed-dim text-primary-fixed-dim hover:bg-primary-fixed-dim/10 transition-colors text-xs font-bold font-mono tracking-widest"
         >
-          [ NEW_SCAN ]
+          [ SEND ALERT ]
         </button>
         <div className="space-y-1 text-xs">
           <Link

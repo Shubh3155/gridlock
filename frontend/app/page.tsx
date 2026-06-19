@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { loginWithGoogle, auth } from "./../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { UserSession } from "../lib/types";
+import { Entropy } from "../components/ui/entropy";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -150,6 +151,11 @@ export default function LandingPage() {
     <div className="min-h-screen flex flex-col bg-background text-foreground relative selection:bg-primary-fixed-dim selection:text-surface">
       <div className="scanline z-50 pointer-events-none"></div>
 
+      {/* Background Entropy Visualizer */}
+      <div className="absolute inset-0 z-0 overflow-hidden flex items-center justify-center pointer-events-none opacity-[0.08] select-none">
+        <Entropy size={900} />
+      </div>
+
       {/* Top Banner Navigation */}
       <header className="bg-surface fixed top-0 w-full z-40 border-b border-outline-variant flex justify-between items-center px-6 h-16 font-mono-data text-[11px] tracking-widest uppercase">
         <div className="flex items-center gap-8">
@@ -258,7 +264,7 @@ export default function LandingPage() {
                   </button>
                 )}
                 <Link
-                  href="/login"
+                  href="/documentation"
                   className="px-8 py-4 bg-surface-container-high border border-outline-variant text-on-surface-variant font-bold uppercase text-xs tracking-widest hover:border-on-surface hover:text-primary transition-all flex items-center justify-center"
                 >
                   [ VIEW_DOCUMENTATION ]

@@ -29,25 +29,22 @@ def predict_grid_likelihood(hour: int, day_of_week: int):
     model = model_data['model']
     hist_coords = model_data['hist_coords']
 
-    # 1. Load cluster centers from zones.geojson
-    # Relative path from backend/
-    zones_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pipeline", "output", "zones.geojson")
-    
+    # 1. Load cluster centers from data_loader (cached Firestore or disk fallback)
     centers = []
-    if os.path.exists(zones_path):
-        try:
-            with open(zones_path, 'r') as f:
-                zones_data = json.load(f)
+    try:
+        import data_loader
+        zones_data = data_loader.get_zones_geojson()
+        if zones_data and zones_data.get('features'):
             for feature in zones_data.get('features', []):
                 center = feature.get('properties', {}).get('center')
                 if center:
                     centers.append([center['lat'], center['lng']])
-        except Exception as e:
-            print(f"Warning: Failed to parse zones.geojson: {e}")
-            
-    # Fallback if zones.geojson doesn't exist or is empty
+    except Exception as e:
+        print(f"Warning: Failed to retrieve zones from data_loader: {e}")
+        
+    # Fallback if no centers were retrieved
     if not centers:
-        print("Warning: zones.geojson not found or empty. Using sample of historical coordinates as grid anchors.")
+        print("Warning: No zone centers retrieved. Using sample of historical coordinates as grid anchors.")
         # Sample 100 random coordinates from historical data
         indices = np.random.choice(len(hist_coords), min(100, len(hist_coords)), replace=False)
         centers = hist_coords[indices].tolist()

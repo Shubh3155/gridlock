@@ -6,6 +6,7 @@ import Link from "next/link";
 import { auth } from "../../../../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { UserSession } from "../../../../lib/types";
+import { api } from "../../../../lib/api";
 
 // Import Components
 import Navbar from "../../../../components/Navbar";
@@ -41,6 +42,32 @@ export default function LogsArchivePage() {
     "[FCM] Server message listener pipeline active.",
     "[LOGS_DAEMON] Streaming system telemetry events below:"
   ]);
+
+  const [availableZones, setAvailableZones] = useState<{ id: string; station: string }[]>([]);
+  const [targetZone, setTargetZone] = useState<string>("");
+  const [violationType, setViolationType] = useState<string>("");
+  const [severityWeight, setSeverityWeight] = useState<number>(1.0);
+  const [isSubmittingViolation, setIsSubmittingViolation] = useState<boolean>(false);
+
+  function addLog(text: string) {
+    setLogs((prev) => [...prev.slice(-30), text]);
+  }
+
+  useEffect(() => {
+    async function fetchZones() {
+      try {
+        const data = await api.getZones();
+        const zonesList = data.features.map(f => ({
+          id: f.properties.zone_id,
+          station: f.properties.police_station
+        }));
+        setAvailableZones(zonesList);
+      } catch (err) {
+        console.warn("Failed to load zones for violation registry form:", err);
+      }
+    }
+    fetchZones();
+  }, []);
 
   // Handle user authentication state
   useEffect(() => {
@@ -101,8 +128,67 @@ export default function LogsArchivePage() {
       router.push("/live-predictor");
     } else if (tab === "system") {
       router.push("/system");
+    } else if (tab === "logs") {
+      router.push("/dashboard/features/logs-archive");
+    } else if (tab === "assets") {
+      router.push("/dashboard?tab=assets");
     } else {
       router.push(`/dashboard?tab=${tab}`);
+    }
+  }
+
+  async function handleSendAlert() {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        alert("Alert dispatch simulated. Connect Firebase for actual delivery.");
+        return;
+      }
+      const token = await firebaseUser.getIdToken();
+      const res = await api.dispatchAlert(token);
+      alert(res.message);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Alert dispatch failed: ${err.message || err}`);
+    }
+  }
+
+  async function handleViolationSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!targetZone) {
+      alert("ERROR: SELECT A TARGET ZONE AREA");
+      return;
+    }
+    if (!violationType.trim()) {
+      alert("ERROR: ENTER VIOLATION TYPE");
+      return;
+    }
+
+    setIsSubmittingViolation(true);
+    addLog(`[REGISTRY] TRANSMITTING INFRACTION FOR ZONE ${targetZone.toUpperCase()}...`);
+
+    try {
+      const res = await api.addViolation(targetZone, {
+        violation_type: violationType.trim().toUpperCase(),
+        weight: severityWeight
+      });
+
+      if (res.status === "ok") {
+        addLog(`[REGISTRY] INFRACTION REGISTERED. NEW PRIORITY: ${res.new_priority_score} (COUNT: ${res.new_count})`);
+        alert(`Infraction registered successfully! Zone priority score updated to ${res.new_priority_score}.`);
+        setViolationType("");
+        setTargetZone("");
+        setSeverityWeight(1.0);
+      } else {
+        addLog(`[ERROR] Registration failed: ${res.message}`);
+        alert(`Failed to add violation: ${res.message}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      addLog(`[ERROR] Transmission failure: ${err.message || err}`);
+      alert(`Transmission failed: ${err.message || err}`);
+    } finally {
+      setIsSubmittingViolation(false);
     }
   }
 
@@ -177,7 +263,7 @@ export default function LogsArchivePage() {
           user={user}
           activeTab="features"
           onTabChange={handleTabChange}
-          onTriggerScan={() => router.push("/dashboard")}
+          onSendAlert={handleSendAlert}
         />
 
         {/* Operational Area */}
@@ -301,6 +387,64 @@ export default function LogsArchivePage() {
                     </div>
 
                   </div>
+                </div>
+
+                {/* Violation Registration Form Card */}
+                <div className="border border-outline-variant bg-surface-container p-5 relative overflow-hidden font-mono">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-[10px] text-primary-fixed-dim font-bold tracking-widest">[ FIG 4.2 ] REGISTER_NEW_INFRACTION</span>
+                    <span className="material-symbols-outlined text-primary-fixed-dim text-base">add_box</span>
+                  </div>
+
+                  <form onSubmit={handleViolationSubmit} className="space-y-3 text-[11px] uppercase">
+                    <div>
+                      <label className="text-[9px] text-on-surface-variant block mb-1">TARGET_ZONE_ID (AREA)</label>
+                      <select 
+                        value={targetZone} 
+                        onChange={(e) => setTargetZone(e.target.value)}
+                        className="w-full bg-surface-container-low border border-outline-variant text-foreground font-mono text-[11px] p-2 outline-none focus:border-primary-fixed-dim"
+                      >
+                        <option value="">-- SELECT AREA --</option>
+                        {availableZones.map(zone => (
+                          <option key={zone.id} value={zone.id}>
+                            {zone.id.toUpperCase()} - {zone.station.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] text-on-surface-variant block mb-1">VIOLATION_TYPE</label>
+                      <input 
+                        type="text" 
+                        value={violationType}
+                        onChange={(e) => setViolationType(e.target.value)}
+                        placeholder="E.G. NO PARKING"
+                        className="w-full bg-surface-container-low border border-outline-variant text-foreground font-mono text-[11px] p-2 outline-none focus:border-primary-fixed-dim placeholder:opacity-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] text-on-surface-variant block mb-1">SEVERITY_WEIGHT (0.1 - 2.0)</label>
+                      <input 
+                        type="number" 
+                        step="0.1"
+                        min="0.1"
+                        max="2.0"
+                        value={severityWeight}
+                        onChange={(e) => setSeverityWeight(parseFloat(e.target.value) || 1.0)}
+                        className="w-full bg-surface-container-low border border-outline-variant text-foreground font-mono text-[11px] p-2 outline-none focus:border-primary-fixed-dim"
+                      />
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={isSubmittingViolation}
+                      className="w-full bg-primary-fixed-dim text-surface py-2.5 text-center font-bold tracking-widest hover:bg-primary-container transition-all active:scale-[0.98] disabled:opacity-50 mt-2"
+                    >
+                      [ TRANSMIT_INFRACTION ]
+                    </button>
+                  </form>
                 </div>
               </div>
 

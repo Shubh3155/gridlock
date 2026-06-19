@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { auth } from "../../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { UserSession } from "../../lib/types";
+import { api } from "../../lib/api";
 
 // Import Components
 import Navbar from "../../components/Navbar";
@@ -215,10 +216,37 @@ export default function SystemPage() {
   // Handle sidebar clicks
   function handleTabChange(tab: string) {
     setActiveTab(tab);
-    if (tab === "dashboard") {
-      router.push("/dashboard");
-    } else if (tab === "enforcement") {
+    if (tab === "enforcement") {
       router.push("/live-predictor");
+    } else if (tab === "logs") {
+      router.push("/dashboard/features/logs-archive");
+    } else if (tab === "assets") {
+      router.push("/dashboard?tab=assets");
+    }
+  }
+
+  async function handleSendAlert() {
+    addLog("[DISPATCH] Querying highest violation area...");
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        addLog("[WARNING] No active Firebase operator session. Simulating alert dispatch...");
+        addLog("[ALERT] Mock alert dispatched to sector operators.");
+        return;
+      }
+      
+      const token = await firebaseUser.getIdToken();
+      addLog("[DISPATCH] Contacting push messaging service...");
+      const res = await api.dispatchAlert(token);
+      
+      if (res.status === "ok") {
+        addLog(`[DISPATCH] Alert sent to ${res.success_count} operators at ${res.police_station}.`);
+      } else {
+        addLog(`[WARNING] Dispatch completed: ${res.message}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      addLog(`[ERROR] Alert dispatch failed: ${err.message || err}`);
     }
   }
 
@@ -403,7 +431,7 @@ export default function SystemPage() {
             user={user}
             activeTab={activeTab}
             onTabChange={handleTabChange}
-            onTriggerScan={initializeGame}
+            onSendAlert={handleSendAlert}
           />
         )}
 

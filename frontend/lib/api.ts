@@ -70,4 +70,28 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ fcm_token: fcmToken }),
     }, idToken),
+
+  dispatchAlert: (idToken: string) =>
+    request<{
+      status: string;
+      message: string;
+      zone_id: string;
+      police_station: string;
+      success_count: number;
+      failure_count: number;
+    }>("/api/alert/dispatch", {
+      method: "POST",
+    }, idToken),
+
+  addViolation: (zoneId: string, body: { violation_type: string; weight: number }) =>
+    request<{
+      status: string;
+      message: string;
+      zone_id: string;
+      new_count: number;
+      new_priority_score: number;
+    }>(`/api/zones/${zoneId}/violations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

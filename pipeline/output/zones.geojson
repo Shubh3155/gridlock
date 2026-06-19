@@ -1272,8 +1272,8 @@
       },
       "properties": {
         "zone_id": "cluster_19",
-        "priority_score": 1.2,
-        "violation_count": 15,
+        "priority_score": 1.3,
+        "violation_count": 16,
         "avg_violation_weight": 0.71,
         "top_violations": [
           "WRONG PARKING",

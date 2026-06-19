@@ -6,6 +6,7 @@ import Link from "next/link";
 import { auth } from "../../../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { UserSession } from "../../../lib/types";
+import { api } from "../../../lib/api";
 
 // Import Components
 import Navbar from "../../../components/Navbar";
@@ -70,8 +71,28 @@ export default function FeaturesDirectoryPage() {
       router.push("/live-predictor");
     } else if (tab === "system") {
       router.push("/system");
+    } else if (tab === "logs") {
+      router.push("/dashboard/features/logs-archive");
+    } else if (tab === "assets") {
+      router.push("/dashboard?tab=assets");
     } else {
       router.push(`/dashboard?tab=${tab}`);
+    }
+  }
+
+  async function handleSendAlert() {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        alert("Alert dispatch simulated. Connect Firebase for actual delivery.");
+        return;
+      }
+      const token = await firebaseUser.getIdToken();
+      const res = await api.dispatchAlert(token);
+      alert(res.message);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Alert dispatch failed: ${err.message || err}`);
     }
   }
 
@@ -180,7 +201,7 @@ export default function FeaturesDirectoryPage() {
           user={user}
           activeTab="features"
           onTabChange={handleTabChange}
-          onTriggerScan={() => router.push("/dashboard")}
+          onSendAlert={handleSendAlert}
         />
 
         {/* Operational Area */}

@@ -393,11 +393,11 @@ function DashboardContent() {
     setCmdValue("");
 
     if (cmd === "help") {
-      addLog("Available commands: [predict, scan, layer, clear, select <zone_id>, snake]");
+      addLog("Available commands: [predict, alert, layer, clear, select <zone_id>, snake]");
     } else if (cmd === "snake") {
       router.push("/system?start=true");
-    } else if (cmd === "scan") {
-      handleTriggerScan();
+    } else if (cmd === "scan" || cmd === "alert") {
+      handleSendAlert();
     } else if (cmd === "clear") {
       setLogs([]);
     } else if (cmd.startsWith("select ")) {
@@ -419,19 +419,38 @@ function DashboardContent() {
     }
   }
 
-  // Trigger Scanner (Mock pipeline rerun)
-  function handleTriggerScan() {
-    addLog("[SCANNER] Dispatching active radar sweep...");
-    setTimeout(() => {
-      const score = (7.0 + Math.random() * 3.0).toFixed(1);
-      setToast({
-        visible: true,
-        title: "🚨 RADAR: CRITICAL RISK DETECTED",
-        body: `NEW ZONE DETECTED - RISK SCORE: ${score}/10 [IMMEDIATE PATROL]`,
-        zoneId: "cluster_0",
-      });
-      addLog(`[ALERT] Active scan identified hotspot risk tier: HIGH.`);
-    }, 15000);
+  // Dispatch push alert to highest violation area users
+  async function handleSendAlert() {
+    addLog("[DISPATCH] Querying highest violation area...");
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        addLog("[WARNING] No active Firebase operator session. Simulating alert dispatch...");
+        setTimeout(() => {
+          setToast({
+            visible: true,
+            title: "🚨 MOCK ALERT: CRITICAL RISK DETECTED",
+            body: "UPPARPET PS (cluster_2) has critical activity: 67798 violations (Score: 10.0/10)",
+            zoneId: "cluster_2",
+          });
+          addLog("[ALERT] Mock alert dispatched to sector operators.");
+        }, 1500);
+        return;
+      }
+      
+      const token = await firebaseUser.getIdToken();
+      addLog("[DISPATCH] Contacting push messaging service...");
+      const res = await api.dispatchAlert(token);
+      
+      if (res.status === "ok") {
+        addLog(`[DISPATCH] Alert sent to ${res.success_count} operators at ${res.police_station}.`);
+      } else {
+        addLog(`[WARNING] Dispatch completed: ${res.message}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      addLog(`[ERROR] Alert dispatch failed: ${err.message || err}`);
+    }
   }
 
   // Handle Deploy enforcer unit
@@ -448,6 +467,8 @@ function DashboardContent() {
       router.push("/live-predictor");
     } else if (tab === "system") {
       router.push("/system");
+    } else if (tab === "logs") {
+      router.push("/dashboard/features/logs-archive");
     } else {
       router.push(`/dashboard?tab=${tab}`);
     }
@@ -487,7 +508,7 @@ function DashboardContent() {
           user={user}
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          onTriggerScan={handleTriggerScan}
+          onSendAlert={handleSendAlert}
         />
 
         {/* Content Area */}

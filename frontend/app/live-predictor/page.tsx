@@ -210,10 +210,37 @@ export default function LivePredictorPage() {
 
   function handleTabChange(tab: string) {
     setActiveTab(tab);
-    if (tab === "dashboard") {
-      router.push("/dashboard");
-    } else if (tab === "system") {
+    if (tab === "system") {
       router.push("/system");
+    } else if (tab === "logs") {
+      router.push("/dashboard/features/logs-archive");
+    } else if (tab === "assets") {
+      router.push("/dashboard?tab=assets");
+    }
+  }
+
+  async function handleSendAlert() {
+    addLog("[DISPATCH] Querying highest violation area...");
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        addLog("[WARNING] No active Firebase operator session. Simulating alert dispatch...");
+        addLog("[ALERT] Mock alert dispatched to sector operators.");
+        return;
+      }
+      
+      const token = await firebaseUser.getIdToken();
+      addLog("[DISPATCH] Contacting push messaging service...");
+      const res = await api.dispatchAlert(token);
+      
+      if (res.status === "ok") {
+        addLog(`[DISPATCH] Alert sent to ${res.success_count} operators at ${res.police_station}.`);
+      } else {
+        addLog(`[WARNING] Dispatch completed: ${res.message}`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      addLog(`[ERROR] Alert dispatch failed: ${err.message || err}`);
     }
   }
 
@@ -260,7 +287,7 @@ export default function LivePredictorPage() {
           user={user}
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          onTriggerScan={handleRunPrediction}
+          onSendAlert={handleSendAlert}
         />
 
         {/* Operational Area */}
