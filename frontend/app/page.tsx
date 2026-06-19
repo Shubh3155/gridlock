@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loginWithGoogle, auth } from "./../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { UserSession } from "../lib/types";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -18,6 +19,48 @@ export default function LandingPage() {
     "TARGET_ID: #40922_BETA FOUND",
     "RISK_LEVEL: HIGH_DENSITY",
   ]);
+
+  const [user, setUser] = useState<UserSession | null>(null);
+
+  // Sync auth state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("gridlock_session");
+      if (cached) {
+        try {
+          setUser(JSON.parse(cached));
+        } catch (_) {}
+      }
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const localSession = {
+            session_id: "local-session",
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            display_name: firebaseUser.displayName,
+          };
+          setUser(localSession);
+          localStorage.setItem("gridlock_session", JSON.stringify(localSession));
+        } catch (e) {}
+      } else {
+        const cached = localStorage.getItem("gridlock_session");
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed.session_id !== "demo-session-id") {
+              setUser(null);
+              localStorage.removeItem("gridlock_session");
+            }
+          } catch (_) {}
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Update clock every second
   useEffect(() => {
@@ -126,18 +169,34 @@ export default function LandingPage() {
           </nav>
         </div>
         <div className="flex items-center gap-4">
-          <Link
-            href="/login"
-            className="text-on-surface-variant px-4 py-1 border border-outline-variant hover:bg-surface-container-highest transition-colors font-bold"
-          >
-            LOGIN
-          </Link>
-          <Link
-            href="/signup"
-            className="bg-primary-fixed-dim text-surface px-4 py-1 font-bold hover:opacity-80 transition-opacity"
-          >
-            REQUEST_ACCESS
-          </Link>
+          {user ? (
+            <>
+              <span className="hidden lg:inline text-[10px] text-on-surface-variant font-mono">
+                {user.display_name || user.email}
+              </span>
+              <Link
+                href="/dashboard"
+                className="bg-primary-fixed-dim text-surface px-4 py-1 font-bold hover:opacity-80 transition-opacity flex items-center justify-center font-mono text-[11px]"
+              >
+                CONSOLE
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-on-surface-variant px-4 py-1 border border-outline-variant hover:bg-surface-container-highest transition-colors font-bold"
+              >
+                LOGIN
+              </Link>
+              <Link
+                href="/signup"
+                className="bg-primary-fixed-dim text-surface px-4 py-1 font-bold hover:opacity-80 transition-opacity"
+              >
+                REQUEST_ACCESS
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -161,16 +220,28 @@ export default function LandingPage() {
                 DBSCAN-powered violation clustering and XGBoost risk prediction for modern urban safety.
               </p>
               <div className="flex flex-wrap gap-4 font-mono">
-                <button
-                  onClick={handleGoogleSignIn}
-                  disabled={isLoggingIn}
-                  className="px-8 py-4 bg-transparent border-2 border-primary-fixed-dim text-primary-fixed-dim font-bold uppercase text-xs tracking-widest hover:bg-primary-fixed-dim hover:text-surface transition-all flex items-center gap-3 group active:scale-95 disabled:opacity-50"
-                >
-                  <span>{isLoggingIn ? "INITIALIZING_SESSION..." : "SIGN IN WITH GOOGLE"}</span>
-                  <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">
-                    login
-                  </span>
-                </button>
+                {user ? (
+                  <Link
+                    href="/dashboard"
+                    className="px-8 py-4 bg-transparent border-2 border-primary-fixed-dim text-primary-fixed-dim font-bold uppercase text-xs tracking-widest hover:bg-primary-fixed-dim hover:text-surface transition-all flex items-center gap-3 group active:scale-95"
+                  >
+                    <span>ENTER DASHBOARD CONSOLE</span>
+                    <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform text-sm">
+                      dashboard
+                    </span>
+                  </Link>
+                ) : (
+                  <button
+                    onClick={handleGoogleSignIn}
+                    disabled={isLoggingIn}
+                    className="px-8 py-4 bg-transparent border-2 border-primary-fixed-dim text-primary-fixed-dim font-bold uppercase text-xs tracking-widest hover:bg-primary-fixed-dim hover:text-surface transition-all flex items-center gap-3 group active:scale-95 disabled:opacity-50"
+                  >
+                    <span>{isLoggingIn ? "INITIALIZING_SESSION..." : "SIGN IN WITH GOOGLE"}</span>
+                    <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">
+                      login
+                    </span>
+                  </button>
+                )}
                 <Link
                   href="/login"
                   className="px-8 py-4 bg-surface-container-high border border-outline-variant text-on-surface-variant font-bold uppercase text-xs tracking-widest hover:border-on-surface hover:text-primary transition-all flex items-center justify-center"
