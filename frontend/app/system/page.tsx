@@ -53,7 +53,23 @@ function playBeep(type: "eat" | "die" | "turn") {
 
 export default function SystemPage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserSession | null>(null);
+  const [user, setUser] = useState<UserSession | null>(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("gridlock_session");
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch (_) {}
+      }
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !localStorage.getItem("gridlock_session");
+    }
+    return true;
+  });
   const [activeTab, setActiveTab] = useState<string>("system");
   const [cmdValue, setCmdValue] = useState<string>("");
   const [logs, setLogs] = useState<string[]>([
@@ -85,15 +101,28 @@ export default function SystemPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        setUser({
+        const session = {
           session_id: "local-session",
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           display_name: firebaseUser.displayName,
-        });
+        };
+        setUser(session);
+        localStorage.setItem("gridlock_session", JSON.stringify(session));
       } else {
-        setUser(null);
+        const cached = localStorage.getItem("gridlock_session");
+        if (cached) {
+          try {
+            setUser(JSON.parse(cached));
+          } catch (err) {
+            localStorage.removeItem("gridlock_session");
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
       }
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -109,6 +138,13 @@ export default function SystemPage() {
       }
     }
   }, []);
+
+  // 1c. Auto-start game for unauthenticated users
+  useEffect(() => {
+    if (!isLoading && !user && !isPlaying && !isGameOver) {
+      initializeGame();
+    }
+  }, [isLoading, user, isPlaying, isGameOver]);
 
 
   // 2. Global window keyboard listener for detecting 'snake' typing easter egg
@@ -344,8 +380,15 @@ export default function SystemPage() {
         user={user}
         onLogin={() => router.push("/login")}
         onLogout={async () => {
-          await signOut(auth);
-          router.push("/login");
+          try {
+            await signOut(auth);
+          } catch (e) {
+            console.warn("Logout error:", e);
+          } finally {
+            localStorage.removeItem("gridlock_session");
+            setUser(null);
+            router.push("/login");
+          }
         }}
         cmdValue={cmdValue}
         onCmdChange={setCmdValue}
@@ -354,12 +397,14 @@ export default function SystemPage() {
 
       <div className="flex flex-1 overflow-hidden relative pt-0">
         {/* Left Control Sidebar */}
-        <Sidebar
-          user={user}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          onTriggerScan={initializeGame}
-        />
+        {user && (
+          <Sidebar
+            user={user}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            onTriggerScan={initializeGame}
+          />
+        )}
 
         {/* Diagnostic Panel operational content */}
         <main className="flex-1 relative overflow-y-auto p-6 flex flex-col justify-between font-mono">
@@ -382,10 +427,10 @@ export default function SystemPage() {
             </div>
 
             {/* Grid display layout */}
-            <div className="grid grid-cols-12 gap-6">
+            <div className={user ? "grid grid-cols-12 gap-6" : "flex flex-col items-center justify-center my-8"}>
               
               {/* Left Column: Diagnostics monitor block */}
-              <div className="col-span-12 lg:col-span-7">
+              <div className={user ? "col-span-12 lg:col-span-7" : "col-span-12 w-full max-w-xl mx-auto"}>
                 <div className="border border-outline-variant bg-surface-container p-4 relative min-h-[460px] flex flex-col justify-between">
                   <div className="border-b border-outline-variant pb-2 mb-4 flex justify-between items-center bg-surface-container-high -mx-4 -mt-4 px-4 py-2">
                     <span className="text-[10px] text-primary-fixed-dim font-bold uppercase tracking-wider">
@@ -468,54 +513,56 @@ export default function SystemPage() {
               </div>
 
               {/* Right Column: Diagnostic Logs and Sector parameters */}
-              <div className="col-span-12 lg:col-span-5 space-y-6">
-                
-                {/* Sector health indicators */}
-                <div className="border border-outline-variant bg-surface-container p-4 font-mono text-xs">
-                  <div className="text-[10px] text-primary-fixed-dim uppercase font-bold mb-3 tracking-wider">
-                    SECTOR_NODE_HEALTH
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between border-b border-outline-variant/40 pb-1">
-                      <span className="text-on-surface-variant">NODE_7G (Central)</span>
-                      <span className="text-tertiary-fixed-dim font-bold">100% OPERATIONAL</span>
+              {user && (
+                <div className="col-span-12 lg:col-span-5 space-y-6">
+                  
+                  {/* Sector health indicators */}
+                  <div className="border border-outline-variant bg-surface-container p-4 font-mono text-xs">
+                    <div className="text-[10px] text-primary-fixed-dim uppercase font-bold mb-3 tracking-wider">
+                      SECTOR_NODE_HEALTH
                     </div>
-                    <div className="flex justify-between border-b border-outline-variant/40 pb-1">
-                      <span className="text-on-surface-variant">NODE_5B (East)</span>
-                      <span className="text-tertiary-fixed-dim font-bold">100% OPERATIONAL</span>
-                    </div>
-                    <div className="flex justify-between border-b border-outline-variant/40 pb-1">
-                      <span className="text-on-surface-variant">XGB_SERVER_POOL</span>
-                      <span className="text-primary-fixed-dim font-bold">SYNCED (14ms)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-on-surface-variant">DB_MUTATION_WRITE</span>
-                      <span className="text-secondary-container font-bold">ALLOWED</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Log feed */}
-                <div className="border border-outline-variant bg-surface-container p-4 h-[260px] overflow-hidden flex flex-col font-mono">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-[10px] text-on-surface-variant font-bold">[ TELEMETRY_STREAM ]</span>
-                    <div className="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto space-y-1 text-[10px] text-on-surface-variant terminal-scroll">
-                    {logs.map((log, index) => (
-                      <div key={index} className="leading-snug">
-                        {log}
+                    <div className="space-y-2">
+                      <div className="flex justify-between border-b border-outline-variant/40 pb-1">
+                        <span className="text-on-surface-variant">NODE_7G (Central)</span>
+                        <span className="text-tertiary-fixed-dim font-bold">100% OPERATIONAL</span>
                       </div>
-                    ))}
+                      <div className="flex justify-between border-b border-outline-variant/40 pb-1">
+                        <span className="text-on-surface-variant">NODE_5B (East)</span>
+                        <span className="text-tertiary-fixed-dim font-bold">100% OPERATIONAL</span>
+                      </div>
+                      <div className="flex justify-between border-b border-outline-variant/40 pb-1">
+                        <span className="text-on-surface-variant">XGB_SERVER_POOL</span>
+                        <span className="text-primary-fixed-dim font-bold">SYNCED (14ms)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-on-surface-variant">DB_MUTATION_WRITE</span>
+                        <span className="text-secondary-container font-bold">ALLOWED</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-3 pt-3 border-t border-outline-variant flex gap-2 items-center text-[9px] text-on-surface-variant opacity-60">
-                    <span className="text-primary-fixed-dim font-bold">&gt;</span>
-                    <span className="caret"></span>
-                    <span>AWAITING INSTRUCTION_</span>
-                  </div>
-                </div>
 
-              </div>
+                  {/* Log feed */}
+                  <div className="border border-outline-variant bg-surface-container p-4 h-[260px] overflow-hidden flex flex-col font-mono">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[10px] text-on-surface-variant font-bold">[ TELEMETRY_STREAM ]</span>
+                      <div className="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-1 text-[10px] text-on-surface-variant terminal-scroll">
+                      {logs.map((log, index) => (
+                        <div key={index} className="leading-snug">
+                          {log}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-outline-variant flex gap-2 items-center text-[9px] text-on-surface-variant opacity-60">
+                      <span className="text-primary-fixed-dim font-bold">&gt;</span>
+                      <span className="caret"></span>
+                      <span>AWAITING INSTRUCTION_</span>
+                    </div>
+                  </div>
+
+                </div>
+              )}
 
             </div>
           </div>

@@ -74,16 +74,31 @@ export default function LandingPage() {
   async function handleGoogleSignIn() {
     setIsLoggingIn(true);
     try {
-      await loginWithGoogle();
+      const result = await loginWithGoogle();
+      const session = {
+        session_id: "local-session",
+        uid: result.user.uid,
+        email: result.user.email,
+        display_name: result.user.displayName,
+      };
+      localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
     } catch (e: any) {
       console.warn("Sign-in error, redirecting using local demo operator:", e);
       // Fallback redirect for offline demo mode
+      const session = {
+        session_id: "demo-session-id",
+        uid: "OP_DEMO",
+        email: "demo@gridlock.gov",
+        display_name: "DEMO OPERATOR",
+      };
+      localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
     } finally {
       setIsLoggingIn(false);
     }
   }
+
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground relative selection:bg-primary-fixed-dim selection:text-surface">

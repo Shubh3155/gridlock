@@ -13,7 +13,23 @@ import Sidebar from "../../components/Sidebar";
 
 export default function LivePredictorPage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserSession | null>(null);
+  const [user, setUser] = useState<UserSession | null>(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("gridlock_session");
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch (_) {}
+      }
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !localStorage.getItem("gridlock_session");
+    }
+    return true;
+  });
   const [activeTab, setActiveTab] = useState<string>("enforcement");
   const [inputSequence, setInputSequence] = useState<string>("");
   
@@ -44,15 +60,29 @@ export default function LivePredictorPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        setUser({
+        const session = {
           session_id: "local-session",
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           display_name: firebaseUser.displayName,
-        });
+        };
+        setUser(session);
+        localStorage.setItem("gridlock_session", JSON.stringify(session));
       } else {
-        setUser(null);
+        const cached = localStorage.getItem("gridlock_session");
+        if (cached) {
+          try {
+            setUser(JSON.parse(cached));
+          } catch (err) {
+            localStorage.removeItem("gridlock_session");
+            router.push("/login");
+          }
+        } else {
+          setUser(null);
+          router.push("/login");
+        }
       }
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -190,6 +220,15 @@ export default function LivePredictorPage() {
   const circ = 439.82;
   const strokeOffset = circ - (circ * probability);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-primary font-mono text-xs select-none animate-pulse">
+        <div className="scanline z-50 pointer-events-none"></div>
+        [ SECURING_OPERATOR_TUNNEL... ]
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden select-none bg-background text-foreground font-mono-data">
       <div className="scanline z-50 pointer-events-none"></div>
@@ -199,8 +238,15 @@ export default function LivePredictorPage() {
         user={user}
         onLogin={() => router.push("/login")}
         onLogout={async () => {
-          await signOut(auth);
-          router.push("/login");
+          try {
+            await signOut(auth);
+          } catch (e) {
+            console.warn("Logout error:", e);
+          } finally {
+            localStorage.removeItem("gridlock_session");
+            setUser(null);
+            router.push("/login");
+          }
         }}
         cmdValue={cmdValue}
         onCmdChange={setCmdValue}

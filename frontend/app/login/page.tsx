@@ -38,6 +38,13 @@ export default function LoginPage() {
 
     setTimeout(() => {
       setStatusText("ACCESS_GRANTED");
+      const session = {
+        session_id: "demo-session-id",
+        uid: operatorId.toUpperCase(),
+        email: `${operatorId.toLowerCase()}@gridlock.gov`,
+        display_name: `OPERATOR ${operatorId.toUpperCase()}`,
+      };
+      localStorage.setItem("gridlock_session", JSON.stringify(session));
       setTimeout(() => {
         // Authenticate locally in demo mode
         router.push("/dashboard");
@@ -50,15 +57,30 @@ export default function LoginPage() {
     setIsPending(true);
     setStatusText("AUTHENTICATING WITH GOOGLE...");
     try {
-      await loginWithGoogle();
+      const result = await loginWithGoogle();
+      const session = {
+        session_id: "local-session",
+        uid: result.user.uid,
+        email: result.user.email,
+        display_name: result.user.displayName,
+      };
+      localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
     } catch (e: any) {
       console.warn("Sign-in error, redirecting using local demo operator:", e);
+      const session = {
+        session_id: "demo-session-id",
+        uid: "OP_DEMO",
+        email: "demo@gridlock.gov",
+        display_name: "DEMO OPERATOR",
+      };
+      localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
     } finally {
       setIsPending(false);
     }
   }
+
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground relative antialiased selection:bg-primary-fixed-dim selection:text-surface">

@@ -152,7 +152,23 @@ export default function Dashboard() {
   const router = useRouter();
 
   // App States
-  const [user, setUser] = useState<UserSession | null>(null);
+  const [user, setUser] = useState<UserSession | null>(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("gridlock_session");
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch (_) {}
+      }
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !localStorage.getItem("gridlock_session");
+    }
+    return true;
+  });
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [activeLayer, setActiveLayer] = useState<"historical" | "predicted">("predicted");
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>("cluster_0");
@@ -194,22 +210,36 @@ export default function Dashboard() {
           const idToken = await firebaseUser.getIdToken();
           const session = await api.verifyAuthToken(idToken);
           setUser(session);
+          localStorage.setItem("gridlock_session", JSON.stringify(session));
           addLog(`[AUTH] User session authorized: ${session.display_name || session.email}`);
           requestNotificationPermission(idToken, api.registerFCMToken);
         } catch (e) {
-          setUser({
+          const localSession = {
             session_id: "local-session",
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             display_name: firebaseUser.displayName,
-          });
+          };
+          setUser(localSession);
+          localStorage.setItem("gridlock_session", JSON.stringify(localSession));
           addLog(`[AUTH] Client auth active (Local session): ${firebaseUser.displayName || firebaseUser.email}`);
         }
       } else {
-        // Redirect to login if user logs out
-        setUser(null);
-        addLog("[AUTH] Session terminated. Operator is offline.");
+        const cached = localStorage.getItem("gridlock_session");
+        if (cached) {
+          try {
+            setUser(JSON.parse(cached));
+          } catch (err) {
+            localStorage.removeItem("gridlock_session");
+            router.push("/login");
+          }
+        } else {
+          setUser(null);
+          addLog("[AUTH] Session terminated. Operator is offline.");
+          router.push("/login");
+        }
       }
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
@@ -332,9 +362,10 @@ export default function Dashboard() {
       if (user && user.session_id !== "demo-session-id" && user.session_id !== "local-session") {
         await api.logout(user.session_id);
       }
-      setUser(null);
-      router.push("/login");
     } catch (e) {
+      console.warn("Logout error:", e);
+    } finally {
+      localStorage.removeItem("gridlock_session");
       setUser(null);
       router.push("/login");
     }
@@ -410,6 +441,15 @@ export default function Dashboard() {
 
   const selectedZone =
     zones?.features.find((f) => f.properties.zone_id === selectedZoneId) || null;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-primary font-mono text-xs select-none animate-pulse">
+        <div className="scanline z-50 pointer-events-none"></div>
+        [ SECURING_OPERATOR_TUNNEL... ]
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden select-none bg-background text-foreground font-mono-data">
