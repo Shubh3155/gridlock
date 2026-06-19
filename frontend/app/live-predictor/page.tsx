@@ -15,6 +15,7 @@ export default function LivePredictorPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserSession | null>(null);
   const [activeTab, setActiveTab] = useState<string>("enforcement");
+  const [inputSequence, setInputSequence] = useState<string>("");
   
   // Predictor Parameters
   const [latitude, setLatitude] = useState<string>("12.9360");
@@ -67,6 +68,30 @@ export default function LivePredictorPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Global window keyboard listener for detecting 'snake' typing easter egg
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      const char = e.key.toLowerCase();
+      if (char.length === 1 && /[a-z]/.test(char)) {
+        setInputSequence((prev) => {
+          const next = (prev + char).slice(-5);
+          if (next === "snake") {
+            router.push("/system?start=true");
+            return "";
+          }
+          return next;
+        });
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [router]);
+
   function addLog(text: string) {
     setPredictorLogs((prev) => [...prev.slice(-30), text]);
   }
@@ -80,7 +105,9 @@ export default function LivePredictorPage() {
     setCmdValue("");
 
     if (cmd === "help") {
-      addLog("Available commands: [predict, clear, back]");
+      addLog("Available commands: [predict, clear, back, snake]");
+    } else if (cmd === "snake") {
+      router.push("/system?start=true");
     } else if (cmd === "predict") {
       handleRunPrediction();
     } else if (cmd === "clear") {
@@ -154,6 +181,8 @@ export default function LivePredictorPage() {
     setActiveTab(tab);
     if (tab === "dashboard") {
       router.push("/dashboard");
+    } else if (tab === "system") {
+      router.push("/system");
     }
   }
 

@@ -10,6 +10,7 @@ export default function LandingPage() {
   const router = useRouter();
   const [time, setTime] = useState<string>("00:00:00");
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [inputSequence, setInputSequence] = useState<string>("");
   const [bootLogs, setBootLogs] = useState<string[]>([
     "INITIATING HEURISTIC_SCAN...",
     "FETCHING SECTOR_7G GEODATA...",
@@ -44,6 +45,30 @@ export default function LandingPage() {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // Global window keyboard listener for detecting 'snake' typing easter egg
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      const char = e.key.toLowerCase();
+      if (char.length === 1 && /[a-z]/.test(char)) {
+        setInputSequence((prev) => {
+          const next = (prev + char).slice(-5);
+          if (next === "snake") {
+            router.push("/system?start=true");
+            return "";
+          }
+          return next;
+        });
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [router]);
 
   // Sign In Trigger
   async function handleGoogleSignIn() {

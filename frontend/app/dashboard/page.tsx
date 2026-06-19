@@ -157,6 +157,7 @@ export default function Dashboard() {
   const [activeLayer, setActiveLayer] = useState<"historical" | "predicted">("predicted");
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>("cluster_0");
   const [isDetailPanelExpanded, setIsDetailPanelExpanded] = useState<boolean>(true);
+  const [inputSequence, setInputSequence] = useState<string>("");
 
   // Backend Data States
   const [stats, setStats] = useState<Stats | null>(null);
@@ -269,6 +270,30 @@ export default function Dashboard() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // 4b. Global window keyboard listener for detecting 'snake' typing easter egg
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      const char = e.key.toLowerCase();
+      if (char.length === 1 && /[a-z]/.test(char)) {
+        setInputSequence((prev) => {
+          const next = (prev + char).slice(-5);
+          if (next === "snake") {
+            router.push("/system?start=true");
+            return "";
+          }
+          return next;
+        });
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [router]);
+
   // 5. Simulated Log Stream Interval
   useEffect(() => {
     const logsPool = [
@@ -325,7 +350,9 @@ export default function Dashboard() {
     setCmdValue("");
 
     if (cmd === "help") {
-      addLog("Available commands: [predict, scan, layer, clear, select <zone_id>]");
+      addLog("Available commands: [predict, scan, layer, clear, select <zone_id>, snake]");
+    } else if (cmd === "snake") {
+      router.push("/system?start=true");
     } else if (cmd === "scan") {
       handleTriggerScan();
     } else if (cmd === "clear") {
@@ -376,6 +403,8 @@ export default function Dashboard() {
     setActiveTab(tab);
     if (tab === "enforcement") {
       router.push("/live-predictor");
+    } else if (tab === "system") {
+      router.push("/system");
     }
   }
 
