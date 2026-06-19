@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { loginWithGoogle } from "../../lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { loginWithGoogle, auth } from "../../lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
   const [time, setTime] = useState<string>("00:00:00");
-  const [operatorId, setOperatorId] = useState<string>("");
-  const [accessCode, setAccessCode] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [statusText, setStatusText] = useState<string>("Identification Required for Sector_7G Access");
   const [isPending, setIsPending] = useState<boolean>(false);
@@ -28,7 +29,7 @@ export default function LoginPage() {
   // Standard Login submit
   async function handleLoginSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!operatorId.trim() || !accessCode.trim()) {
+    if (!email.trim() || !password.trim()) {
       setStatusText("ERROR: ALL FIELDS ARE REQUIRED");
       return;
     }
@@ -36,20 +37,33 @@ export default function LoginPage() {
     setIsPending(true);
     setStatusText("VALIDATING_CREDENTIALS...");
 
-    setTimeout(() => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
       setStatusText("ACCESS_GRANTED");
+
       const session = {
-        session_id: "demo-session-id",
-        uid: operatorId.toUpperCase(),
-        email: `${operatorId.toLowerCase()}@gridlock.gov`,
-        display_name: `OPERATOR ${operatorId.toUpperCase()}`,
+        session_id: "local-session",
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        display_name: userCredential.user.displayName || email.split("@")[0].toUpperCase(),
+        photo_url: userCredential.user.photoURL,
       };
       localStorage.setItem("gridlock_session", JSON.stringify(session));
+
       setTimeout(() => {
-        // Authenticate locally in demo mode
         router.push("/dashboard");
       }, 800);
-    }, 1500);
+    } catch (err: any) {
+      console.error("Login error:", err);
+      let errMsg = "ACCESS_DENIED: " + (err.message || "UNKNOWN ERROR");
+      if (err.code === "auth/wrong-password" || err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+        errMsg = "ERROR: INVALID EMAIL OR ACCESS CODE";
+      } else if (err.code === "auth/invalid-email") {
+        errMsg = "ERROR: INVALID EMAIL FORMAT";
+      }
+      setStatusText(errMsg);
+      setIsPending(false);
+    }
   }
 
   // Google Login trigger
@@ -63,6 +77,7 @@ export default function LoginPage() {
         uid: result.user.uid,
         email: result.user.email,
         display_name: result.user.displayName,
+        photo_url: result.user.photoURL,
       };
       localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
@@ -73,6 +88,7 @@ export default function LoginPage() {
         uid: "OP_DEMO",
         email: "demo@gridlock.gov",
         display_name: "DEMO OPERATOR",
+        photo_url: null,
       };
       localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
@@ -80,7 +96,6 @@ export default function LoginPage() {
       setIsPending(false);
     }
   }
-
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground relative antialiased selection:bg-primary-fixed-dim selection:text-surface">
@@ -126,19 +141,20 @@ export default function LoginPage() {
 
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 
-                {/* Operator ID input */}
+                {/* Operator Email input */}
                 <div className="space-y-1">
                   <label className="text-[10px] text-on-surface-variant block uppercase tracking-wider">
-                    OPERATOR_ID
+                    OPERATOR_EMAIL
                   </label>
                   <div className="relative flex items-center border border-outline-variant focus-within:border-primary-fixed-dim transition-all bg-surface-container-low focus-within:shadow-[0_0_10px_rgba(0,240,255,0.15)]">
                     <span className="pl-3 text-primary-fixed-dim font-bold text-xs">&gt;</span>
                     <input
-                      className="w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-2.5 px-2 uppercase text-foreground font-mono"
-                      placeholder="OP_XXXXX"
-                      type="text"
-                      value={operatorId}
-                      onChange={(e) => setOperatorId(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-2.5 px-2 text-foreground font-mono"
+                      placeholder="OPERATOR@GOV.IN"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
@@ -154,8 +170,9 @@ export default function LoginPage() {
                       className="w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-2.5 px-2 text-foreground font-mono"
                       placeholder="••••••••"
                       type={showPassword ? "text" : "password"}
-                      value={accessCode}
-                      onChange={(e) => setAccessCode(e.target.value)}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
                     />
                     <button
                       onClick={() => setShowPassword((prev) => !prev)}

@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../../lib/firebase";
 
 export default function SignupPage() {
   const router = useRouter();
   const [time, setTime] = useState<string>("00:00:00");
   const [email, setEmail] = useState<string>("");
-  const [sector, setSector] = useState<string>("SECTOR_7G");
-  const [reason, setReason] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
   const [statusText, setStatusText] = useState<string>("Enter registry data to request credentials");
   const [isPending, setIsPending] = useState<boolean>(false);
 
@@ -25,9 +26,9 @@ export default function SignupPage() {
   }, []);
 
   // Submit request access form
-  function handleSignupSubmit(e: React.FormEvent) {
+  async function handleSignupSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !reason.trim()) {
+    if (!email.trim() || !password.trim()) {
       setStatusText("ERROR: ALL FIELDS ARE REQUIRED");
       return;
     }
@@ -35,13 +36,35 @@ export default function SignupPage() {
     setIsPending(true);
     setStatusText("TRANSMITTING_REGISTRY_REQUEST...");
 
-    setTimeout(() => {
-      setStatusText("REQUEST_LOGGED_IN_REGISTRY");
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      setStatusText("REGISTRY_CREATED_SUCCESS");
+
+      const session = {
+        session_id: "local-session",
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        display_name: userCredential.user.displayName || email.split("@")[0].toUpperCase(),
+        photo_url: userCredential.user.photoURL,
+      };
+      localStorage.setItem("gridlock_session", JSON.stringify(session));
+
       setTimeout(() => {
-        alert("REGISTRY QUEUED: Admin will review and authorize operator key. Redirecting to LOGIN...");
-        router.push("/login");
-      }, 1500);
-    }, 1500);
+        router.push("/dashboard");
+      }, 800);
+    } catch (err: any) {
+      console.error("Signup error:", err);
+      let errMsg = "REGISTRY_FAILED: " + (err.message || "UNKNOWN ERROR");
+      if (err.code === "auth/email-already-in-use") {
+        errMsg = "ERROR: EMAIL ALREADY REGISTERED";
+      } else if (err.code === "auth/invalid-email") {
+        errMsg = "ERROR: INVALID EMAIL FORMAT";
+      } else if (err.code === "auth/weak-password") {
+        errMsg = "ERROR: PASSWORD TOO WEAK";
+      }
+      setStatusText(errMsg);
+      setIsPending(false);
+    }
   }
 
   return (
@@ -101,42 +124,25 @@ export default function SignupPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
 
-                {/* Sector select option */}
+                {/* Password input */}
                 <div className="space-y-1">
                   <label className="text-[10px] text-on-surface-variant block uppercase tracking-wider">
-                    TARGET_SECTOR
-                  </label>
-                  <div className="relative flex items-center border border-outline-variant focus-within:border-primary-fixed-dim transition-all bg-surface-container-low">
-                    <span className="pl-3 text-primary-fixed-dim font-bold text-xs">&gt;</span>
-                    <select
-                      className="w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-2.5 px-2 text-foreground font-mono appearance-none uppercase"
-                      value={sector}
-                      onChange={(e) => setSector(e.target.value)}
-                    >
-                      <option value="SECTOR_7G">SECTOR_7G (BENGALURU CENTRAL)</option>
-                      <option value="SECTOR_5B">SECTOR_5B (BENGALURU EAST)</option>
-                      <option value="SECTOR_3A">SECTOR_3A (BENGALURU WEST)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Reason input */}
-                <div className="space-y-1">
-                  <label className="text-[10px] text-on-surface-variant block uppercase tracking-wider">
-                    AUTHORIZATION_REASON
+                    ACCESS_CODE (PASSWORD)
                   </label>
                   <div className="relative flex items-center border border-outline-variant focus-within:border-primary-fixed-dim transition-all bg-surface-container-low focus-within:shadow-[0_0_10px_rgba(0,240,255,0.15)]">
                     <span className="pl-3 text-primary-fixed-dim font-bold text-xs">&gt;</span>
                     <input
-                      className="w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-2.5 px-2 text-foreground font-mono uppercase"
-                      placeholder="E.G. TRAFFIC DISPATCH SUPERVISOR"
-                      type="text"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none focus:ring-0 text-xs py-2.5 px-2 text-foreground font-mono"
+                      placeholder="••••••••"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
@@ -148,7 +154,7 @@ export default function SignupPage() {
                     disabled={isPending}
                     className="w-full bg-primary-fixed-dim text-surface py-2.5 font-bold uppercase text-xs tracking-widest hover:bg-primary-container transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <span>TRANSMIT_REQUEST</span>
+                    <span>INITIALIZE_REGISTRY</span>
                     <span className="material-symbols-outlined text-sm">send</span>
                   </button>
                 </div>

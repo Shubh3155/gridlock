@@ -70,4 +70,5 @@ export interface UserSession {
   uid: string;
   email: string | null;
   display_name: string | null;
+  photo_url?: string | null;
 }

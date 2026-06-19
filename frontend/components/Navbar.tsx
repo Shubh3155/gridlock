@@ -1,8 +1,8 @@
 'use client';
 
-import React from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { UserSession } from "../lib/types";
 
 interface NavbarProps {
@@ -14,7 +14,7 @@ interface NavbarProps {
   onCmdSubmit: (e: React.FormEvent) => void;
 }
 
-export default function Navbar({
+function NavbarContent({
   user,
   onLogin,
   onLogout,
@@ -23,8 +23,12 @@ export default function Navbar({
   onCmdSubmit,
 }: NavbarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "dashboard";
 
-  const isNetworkActive = pathname === "/dashboard";
+  const isNetworkActive = pathname === "/dashboard" && activeTab === "dashboard";
+  const isAssetsActive = pathname === "/dashboard" && activeTab === "assets";
+  const isLogsActive = pathname === "/dashboard" && activeTab === "logs";
   const isThreatsActive = pathname === "/live-predictor";
 
   const activeClass = "text-primary border-b-2 border-primary pb-1 px-2 py-1 font-bold";
@@ -40,13 +44,13 @@ export default function Navbar({
           <nav className="hidden md:flex gap-4 ml-8 text-sm">
             <Link
               className={isNetworkActive ? activeClass : inactiveClass}
-              href="/dashboard"
+              href="/dashboard?tab=dashboard"
             >
               NETWORK
             </Link>
             <Link
-              className={inactiveClass}
-              href="/dashboard"
+              className={isAssetsActive ? activeClass : inactiveClass}
+              href="/dashboard?tab=assets"
             >
               ASSETS
             </Link>
@@ -57,8 +61,8 @@ export default function Navbar({
               THREATS
             </Link>
             <Link
-              className={inactiveClass}
-              href="/dashboard"
+              className={isLogsActive ? activeClass : inactiveClass}
+              href="/dashboard?tab=logs"
             >
               LOGS
             </Link>
@@ -76,7 +80,7 @@ export default function Navbar({
             <span className="text-primary-fixed-dim font-bold">&gt;</span>
             <input
               className="bg-transparent border-none outline-none focus:ring-0 text-xs font-mono w-32 placeholder:text-on-surface-variant/40 text-foreground"
-              placeholder="CMD_PROMPT"
+              placeholder="TYPE SNAKE"
               type="text"
               value={cmdValue}
               onChange={(e) => onCmdChange(e.target.value)}
@@ -116,3 +120,18 @@ export default function Navbar({
   );
 }
 
+export default function Navbar(props: NavbarProps) {
+  return (
+    <Suspense fallback={
+      <header className="bg-surface text-primary-fixed-dim font-mono-data uppercase tracking-widest border-b border-outline-variant flex justify-between items-center w-full px-6 h-16 z-50">
+        <div className="flex items-center gap-8">
+          <Link href="/" className="font-headline-md text-xl font-bold text-primary-fixed-dim tracking-tighter hover:opacity-80 transition-opacity">
+            ENFORCEMENT_INTEL_v4.2
+          </Link>
+        </div>
+      </header>
+    }>
+      <NavbarContent {...props} />
+    </Suspense>
+  );
+}

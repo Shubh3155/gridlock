@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Stats,
   ZoneFeatureCollection,
@@ -148,7 +148,7 @@ const MOCK_HISTORICAL_POINTS: ViolationPoint[] = [
   { latitude: 12.9780, longitude: 77.6380, violation_weight: 0.6 },
 ];
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
 
   // App States
@@ -170,6 +170,16 @@ export default function Dashboard() {
     return true;
   });
   const [activeTab, setActiveTab] = useState<string>("dashboard");
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) {
+      if (["dashboard", "assets", "logs"].includes(tab)) {
+        setActiveTab(tab);
+      }
+    }
+  }, [searchParams]);
   const [activeLayer, setActiveLayer] = useState<"historical" | "predicted">("predicted");
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>("cluster_0");
   const [isDetailPanelExpanded, setIsDetailPanelExpanded] = useState<boolean>(true);
@@ -209,9 +219,10 @@ export default function Dashboard() {
         try {
           const idToken = await firebaseUser.getIdToken();
           const session = await api.verifyAuthToken(idToken);
-          setUser(session);
-          localStorage.setItem("gridlock_session", JSON.stringify(session));
-          addLog(`[AUTH] User session authorized: ${session.display_name || session.email}`);
+          const sessionWithPhoto = { ...session, photo_url: firebaseUser.photoURL || (session as any).photo_url || null };
+          setUser(sessionWithPhoto);
+          localStorage.setItem("gridlock_session", JSON.stringify(sessionWithPhoto));
+          addLog(`[AUTH] User session authorized: ${sessionWithPhoto.display_name || sessionWithPhoto.email}`);
           requestNotificationPermission(idToken, api.registerFCMToken);
         } catch (e) {
           const localSession = {
@@ -219,6 +230,7 @@ export default function Dashboard() {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             display_name: firebaseUser.displayName,
+            photo_url: firebaseUser.photoURL,
           };
           setUser(localSession);
           localStorage.setItem("gridlock_session", JSON.stringify(localSession));
@@ -436,6 +448,8 @@ export default function Dashboard() {
       router.push("/live-predictor");
     } else if (tab === "system") {
       router.push("/system");
+    } else {
+      router.push(`/dashboard?tab=${tab}`);
     }
   }
 
@@ -584,5 +598,18 @@ export default function Dashboard() {
         }}
       />
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background text-primary font-mono text-xs select-none animate-pulse">
+        <div className="scanline z-50 pointer-events-none"></div>
+        [ SECURING_OPERATOR_TUNNEL... ]
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

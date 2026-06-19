@@ -41,6 +41,7 @@ export default function LandingPage() {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             display_name: firebaseUser.displayName,
+            photo_url: firebaseUser.photoURL,
           };
           setUser(localSession);
           localStorage.setItem("gridlock_session", JSON.stringify(localSession));
@@ -123,6 +124,7 @@ export default function LandingPage() {
         uid: result.user.uid,
         email: result.user.email,
         display_name: result.user.displayName,
+        photo_url: result.user.photoURL,
       };
       localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
@@ -134,6 +136,7 @@ export default function LandingPage() {
         uid: "OP_DEMO",
         email: "demo@gridlock.gov",
         display_name: "DEMO OPERATOR",
+        photo_url: null,
       };
       localStorage.setItem("gridlock_session", JSON.stringify(session));
       router.push("/dashboard");
@@ -154,18 +157,30 @@ export default function LandingPage() {
             ENFORCEMENT_INTEL_v4.2
           </span>
           <nav className="hidden md:flex gap-6">
-            <span className="text-primary-fixed-dim border-b-2 border-primary-fixed-dim pb-1">
+            <Link
+              href={user ? "/dashboard?tab=dashboard" : "/login"}
+              className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            >
               NETWORK
-            </span>
-            <span className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+            </Link>
+            <Link
+              href={user ? "/dashboard?tab=assets" : "/login"}
+              className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            >
               ASSETS
-            </span>
-            <span className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+            </Link>
+            <Link
+              href={user ? "/live-predictor" : "/login"}
+              className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            >
               THREATS
-            </span>
-            <span className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+            </Link>
+            <Link
+              href={user ? "/dashboard?tab=logs" : "/login"}
+              className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            >
               LOGS
-            </span>
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-4">

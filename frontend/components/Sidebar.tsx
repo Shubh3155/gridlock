@@ -1,6 +1,7 @@
 'use client';
 
 import React from "react";
+import Link from "next/link";
 import { UserSession } from "../lib/types";
 
 interface SidebarProps {
@@ -18,9 +19,9 @@ export default function Sidebar({
 }: SidebarProps) {
   const navItems = [
     { id: "dashboard", label: "DASHBOARD", icon: "grid_view" },
-    { id: "monitoring", label: "MONITORING", icon: "visibility" },
+    { id: "assets", label: "ASSETS", icon: "visibility" },
     { id: "enforcement", label: "ENFORCEMENT", icon: "gavel" },
-    { id: "archive", label: "ARCHIVE", icon: "inventory_2" },
+    { id: "logs", label: "LOGS", icon: "inventory_2" },
     { id: "system", label: "SYSTEM", icon: "settings" },
   ];
 
@@ -29,10 +30,19 @@ export default function Sidebar({
       {/* Operator Status */}
       <div className="px-6 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 border border-primary-fixed-dim flex items-center justify-center">
-            <span className="material-symbols-outlined text-primary-fixed-dim">
-              account_circle
-            </span>
+          <div className="w-10 h-10 border border-primary-fixed-dim flex items-center justify-center overflow-hidden">
+            {user && user.photo_url ? (
+              <img
+                src={user.photo_url}
+                alt="Profile"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className="material-symbols-outlined text-primary-fixed-dim">
+                account_circle
+              </span>
+            )}
           </div>
           <div>
             <div className="text-sm font-bold text-primary-fixed-dim leading-none">
@@ -75,6 +85,13 @@ export default function Sidebar({
           [ NEW_SCAN ]
         </button>
         <div className="space-y-1 text-xs">
+          <Link
+            className={`flex items-center py-2 text-on-surface-variant hover:text-primary transition-colors ${activeTab === "features" ? "text-primary font-bold" : ""}`}
+            href="/dashboard/features"
+          >
+            <span className="material-symbols-outlined text-sm mr-2">info</span>
+            FEATURES DIRECTORY
+          </Link>
           <a
             className="flex items-center py-2 text-on-surface-variant hover:text-primary-fixed-dim transition-colors"
             href="#"

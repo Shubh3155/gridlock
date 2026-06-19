@@ -106,6 +106,7 @@ export default function SystemPage() {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           display_name: firebaseUser.displayName,
+          photo_url: firebaseUser.photoURL,
         };
         setUser(session);
         localStorage.setItem("gridlock_session", JSON.stringify(session));
