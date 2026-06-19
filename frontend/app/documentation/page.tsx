@@ -164,15 +164,15 @@ export default function DocumentationPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[11px] leading-relaxed uppercase text-on-surface-variant">
               <div>
-                <h3 className="text-xs font-bold text-foreground mb-1">DATA PROCESSING PIPELINE</h3>
+                <h3 className="text-xs font-bold text-foreground mb-1">DATA PIPELINE & FIRESTORE CLOUD</h3>
                 <p className="opacity-80">
-                  Raw infractions datasets containing coordinates and timestamps are processed under the <span className="text-foreground">pipeline/</span> workspace. DBSCAN groups coordinates into dense violation hotspots, which are saved in <span className="text-foreground">zones.geojson</span>. Feature mapping encodes parameters such as peak hours, junction distances, and station loads to train the XGBoost regressor model.
+                  Raw infraction datasets are processed to compile coordinates into dense DBSCAN violation hotspots. On startup, these zones are dynamically migrated to the Google Firestore cloud database (<span className="text-foreground">zones</span> collection), bypassing nested array limits via geometry serialization to provide real-time updates across multiple operator sessions.
                 </p>
               </div>
               <div>
-                <h3 className="text-xs font-bold text-foreground mb-1">API & TELEMETRY DELIVERY</h3>
+                <h3 className="text-xs font-bold text-foreground mb-1">API & CLOUD TELEMETRY</h3>
                 <p className="opacity-80">
-                  The FastAPI application serves pre-calculated spatial polygons, loads the serialized XGBoost regressor, and computes on-demand coordinates risk score predictions. It integrates with Firebase Authentication for operator session validation and implements Firebase Cloud Messaging (FCM) to push live hotspot alerts directly into browser client workers.
+                  The FastAPI backend serves spatial polygons from Firestore, computes on-demand XGBoost risk predictions, and maps live infraction counts. It coordinates Firebase Auth tokens for session authorization and leverages Firebase Cloud Messaging (FCM) to push critical alerts directly to active operators.
                 </p>
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function DocumentationPage() {
                 NETWORK VISUALIZER
               </h3>
               <p className="opacity-85">
-                Displays real-time Leaflet GIS overlays containing DBSCAN-constructed hotspots. Each hotspot contains a prioritized risk score calculated dynamically based on violation density ratios and dispatcher station capacities. Requires operator authorization to load.
+                Displays real-time Leaflet GIS overlays containing DBSCAN-constructed hotspots. Features a **`[ SEND ALERT ]`** control button in the Left Sidebar that resolves the highest violation area and sends a multicast FCM push notification to all sector operators. Requires authorization.
               </p>
             </div>
 
@@ -213,10 +213,10 @@ export default function DocumentationPage() {
             <div className="border border-outline-variant/60 p-4 bg-surface-container-low">
               <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm text-primary-fixed-dim">inventory_2</span>
-                TELEMETRY ARCHIVE
+                TELEMETRY & REGISTRY
               </h3>
               <p className="opacity-85">
-                Provides central logging files containing system operation triggers, API endpoint queries, client FCM connection streams, and specific machine learning model statistics. Contains built-in buffer clearing and download tools. Requires operator authorization to load.
+                Provides central operations logging, buffer clearing, and ML stats. Features an interactive **`[ REGISTER_NEW_INFRACTION ]`** submission form that writes directly to the Firestore cloud database, updating priority scores on the map overlay dynamically. Requires operator session.
               </p>
             </div>
 
