@@ -158,7 +158,7 @@ export default function LandingPage() {
           </span>
           <nav className="hidden md:flex gap-6">
             <Link
-              href={user ? "/dashboard?tab=dashboard" : "/login"}
+              href={user ? "/dashboard/features" : "/login"}
               className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
             >
               NETWORK
@@ -176,7 +176,7 @@ export default function LandingPage() {
               THREATS
             </Link>
             <Link
-              href={user ? "/dashboard?tab=logs" : "/login"}
+              href={user ? "/dashboard/features/logs-archive" : "/login"}
               className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
             >
               LOGS

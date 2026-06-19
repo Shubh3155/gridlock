@@ -26,9 +26,9 @@ function NavbarContent({
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "dashboard";
 
-  const isNetworkActive = pathname === "/dashboard" && activeTab === "dashboard";
+  const isNetworkActive = pathname === "/dashboard/features";
   const isAssetsActive = pathname === "/dashboard" && activeTab === "assets";
-  const isLogsActive = pathname === "/dashboard" && activeTab === "logs";
+  const isLogsActive = pathname === "/dashboard/features/logs-archive";
   const isThreatsActive = pathname === "/live-predictor";
 
   const activeClass = "text-primary border-b-2 border-primary pb-1 px-2 py-1 font-bold";
@@ -44,7 +44,7 @@ function NavbarContent({
           <nav className="hidden md:flex gap-4 ml-8 text-sm">
             <Link
               className={isNetworkActive ? activeClass : inactiveClass}
-              href="/dashboard?tab=dashboard"
+              href="/dashboard/features"
             >
               NETWORK
             </Link>
@@ -62,7 +62,7 @@ function NavbarContent({
             </Link>
             <Link
               className={isLogsActive ? activeClass : inactiveClass}
-              href="/dashboard?tab=logs"
+              href="/dashboard/features/logs-archive"
             >
               LOGS
             </Link>

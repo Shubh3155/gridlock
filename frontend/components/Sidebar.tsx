@@ -18,7 +18,6 @@ export default function Sidebar({
   onTriggerScan,
 }: SidebarProps) {
   const navItems = [
-    { id: "dashboard", label: "DASHBOARD", icon: "grid_view" },
     { id: "assets", label: "ASSETS", icon: "visibility" },
     { id: "enforcement", label: "ENFORCEMENT", icon: "gavel" },
     { id: "logs", label: "LOGS", icon: "inventory_2" },

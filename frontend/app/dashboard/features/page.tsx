@@ -133,7 +133,7 @@ export default function FeaturesDirectoryPage() {
     {
       title: "Logs & telemetries Archive",
       description: "Centralized logging stream tracking verified dispatch operations, patrol responses, and database updates. Logs transaction payloads and registers FCM client browser push tokens.",
-      link: "/dashboard?tab=logs",
+      link: "/dashboard/features/logs-archive",
       btnText: "Open Logs Registry",
       icon: "inventory_2",
       colorClass: "text-outline",
