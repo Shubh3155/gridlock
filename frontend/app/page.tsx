@@ -1,65 +1,262 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { loginWithGoogle, auth } from "./../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+
+export default function LandingPage() {
+  const router = useRouter();
+  const [time, setTime] = useState<string>("00:00:00");
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [bootLogs, setBootLogs] = useState<string[]>([
+    "INITIATING HEURISTIC_SCAN...",
+    "FETCHING SECTOR_7G GEODATA...",
+    "APPLYING XGBOOST WEIGHTS...",
+    "TARGET_ID: #40922_BETA FOUND",
+    "RISK_LEVEL: HIGH_DENSITY",
+  ]);
+
+  // Update clock every second
+  useEffect(() => {
+    function updateClock() {
+      const now = new Date();
+      setTime(now.toTimeString().split(" ")[0]);
+    }
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Periodic mock logs updates for right visual console
+  useEffect(() => {
+    const logsPool = [
+      "ACK SIGNAL FROM SECTOR_7G",
+      "RE-ROUTING LOGISTICS TELEMETRY",
+      "UPDATING PRIORITY QUEUE MATRIX",
+      "HEARTBEAT OK // SERVER STATE 1",
+      "SURVEILLANCE ARRAY ENGAGED",
+    ];
+    const interval = setInterval(() => {
+      const log = logsPool[Math.floor(Math.random() * logsPool.length)];
+      setBootLogs((prev) => [...prev.slice(-6), log]);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sign In Trigger
+  async function handleGoogleSignIn() {
+    setIsLoggingIn(true);
+    try {
+      await loginWithGoogle();
+      router.push("/dashboard");
+    } catch (e: any) {
+      console.warn("Sign-in error, redirecting using local demo operator:", e);
+      // Fallback redirect for offline demo mode
+      router.push("/dashboard");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen flex flex-col bg-background text-foreground relative selection:bg-primary-fixed-dim selection:text-surface">
+      <div className="scanline z-50 pointer-events-none"></div>
+
+      {/* Top Banner Navigation */}
+      <header className="bg-surface fixed top-0 w-full z-40 border-b border-outline-variant flex justify-between items-center px-6 h-16 font-mono-data text-[11px] tracking-widest uppercase">
+        <div className="flex items-center gap-8">
+          <span className="font-headline-md text-sm font-bold text-primary-fixed-dim tracking-tighter">
+            ENFORCEMENT_INTEL_v4.2
+          </span>
+          <nav className="hidden md:flex gap-6">
+            <span className="text-primary-fixed-dim border-b-2 border-primary-fixed-dim pb-1">
+              NETWORK
+            </span>
+            <span className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+              ASSETS
+            </span>
+            <span className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+              THREATS
+            </span>
+            <span className="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+              LOGS
+            </span>
+          </nav>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="flex items-center gap-4">
+          <Link
+            href="/login"
+            className="text-on-surface-variant px-4 py-1 border border-outline-variant hover:bg-surface-container-highest transition-colors font-bold"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            LOGIN
+          </Link>
+          <Link
+            href="/signup"
+            className="bg-primary-fixed-dim text-surface px-4 py-1 font-bold hover:opacity-80 transition-opacity"
           >
-            Documentation
-          </a>
+            REQUEST_ACCESS
+          </Link>
         </div>
+      </header>
+
+      {/* Main operational Hero Body */}
+      <main className="flex-grow pt-24 max-w-7xl mx-auto w-full px-6 flex flex-col justify-center">
+        <section className="py-16 md:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8 flex flex-col justify-center">
+              <div className="mb-3 flex items-center gap-2 text-primary-fixed-dim">
+                <span className="material-symbols-outlined text-sm">terminal</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest font-mono">
+                  BOOT_SEQUENCE_COMPLETE
+                </span>
+              </div>
+              <h1 className="font-mono text-5xl md:text-7xl font-extrabold leading-none tracking-tighter mb-6 uppercase">
+                ENFORCEMENT
+                <br />
+                INTEL
+              </h1>
+              <p className="text-sm font-mono text-on-surface-variant max-w-2xl mb-8 border-l-2 border-primary-fixed-dim pl-6 leading-relaxed uppercase">
+                DBSCAN-powered violation clustering and XGBoost risk prediction for modern urban safety.
+              </p>
+              <div className="flex flex-wrap gap-4 font-mono">
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={isLoggingIn}
+                  className="px-8 py-4 bg-transparent border-2 border-primary-fixed-dim text-primary-fixed-dim font-bold uppercase text-xs tracking-widest hover:bg-primary-fixed-dim hover:text-surface transition-all flex items-center gap-3 group active:scale-95 disabled:opacity-50"
+                >
+                  <span>{isLoggingIn ? "INITIALIZING_SESSION..." : "SIGN IN WITH GOOGLE"}</span>
+                  <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">
+                    login
+                  </span>
+                </button>
+                <Link
+                  href="/login"
+                  className="px-8 py-4 bg-surface-container-high border border-outline-variant text-on-surface-variant font-bold uppercase text-xs tracking-widest hover:border-on-surface hover:text-primary transition-all flex items-center justify-center"
+                >
+                  [ VIEW_DOCUMENTATION ]
+                </Link>
+              </div>
+            </div>
+
+            {/* Right Terminal Visual Overlay */}
+            <div className="lg:col-span-4 hidden lg:block relative font-mono">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary-fixed-dim/5 to-transparent rounded-none"></div>
+              <div className="border border-outline-variant p-4 h-full bg-surface-container-lowest/50 backdrop-blur-sm relative">
+                <div className="border-b border-outline-variant flex justify-between items-center px-4 py-2 mb-4 -mx-4 -mt-4 bg-surface-container-high">
+                  <span className="text-[10px] text-on-surface-variant opacity-70">SYS_MONITOR_0.1</span>
+                  <div className="flex gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-error"></div>
+                    <div className="w-2 h-2 rounded-full bg-secondary-container"></div>
+                    <div className="w-2 h-2 bg-primary-fixed-dim"></div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="h-44 w-full overflow-hidden border border-outline-variant bg-black/40">
+                    <div className="p-2 space-y-1 text-[10px] text-primary-fixed-dim/80">
+                      {bootLogs.map((log, idx) => (
+                        <p key={idx}>&gt; {log}</p>
+                      ))}
+                      <p className="animate-pulse">&gt; █</p>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-primary-fixed-dim/5 border border-primary-fixed-dim/20">
+                    <div className="text-[9px] uppercase mb-2 opacity-60 font-bold tracking-wider">
+                      Threat Density Matrix
+                    </div>
+                    <div className="grid grid-cols-6 gap-1">
+                      <div className="h-4 bg-primary-fixed-dim/40"></div>
+                      <div className="h-4 bg-primary-fixed-dim/20"></div>
+                      <div className="h-4 bg-primary-fixed-dim/60"></div>
+                      <div className="h-4 bg-primary-fixed-dim/10"></div>
+                      <div className="h-4 bg-error/40 animate-pulse"></div>
+                      <div className="h-4 bg-error"></div>
+                      <div className="h-4 bg-primary-fixed-dim/20"></div>
+                      <div className="h-4 bg-primary-fixed-dim/10"></div>
+                      <div className="h-4 bg-primary-fixed-dim/40"></div>
+                      <div className="h-4 bg-primary-fixed-dim/80 animate-pulse"></div>
+                      <div className="h-4 bg-primary-fixed-dim/30"></div>
+                      <div className="h-4 bg-primary-fixed-dim/20"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* System capabilities section */}
+        <section className="py-16 border-t border-outline-variant/30 font-mono">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-8">
+            <div>
+              <h2 className="text-lg font-bold mb-1 tracking-wider">SYSTEM_CAPABILITIES</h2>
+              <p className="text-xs text-on-surface-variant">Core modules for algorithmic urban management.</p>
+            </div>
+            <span className="text-[10px] text-primary-fixed-dim hidden md:block">VER: 4.2.0-STABLE</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Card 1 */}
+            <div className="border border-outline-variant hover:border-primary-fixed-dim transition-all bg-surface-container overflow-hidden">
+              <div className="px-4 py-2 border-b border-outline-variant flex justify-between items-center text-[10px] bg-surface-container-high font-bold tracking-widest">
+                <span>[ FIG. 1 ]</span>
+                <span className="text-primary-fixed-dim">MODULE_DETECT</span>
+              </div>
+              <div className="p-6">
+                <div className="w-10 h-10 border border-primary-fixed-dim/30 flex items-center justify-center mb-4 bg-primary-fixed-dim/5">
+                  <span className="material-symbols-outlined text-primary-fixed-dim text-lg">radar</span>
+                </div>
+                <h3 className="text-sm font-bold mb-2">Violation Clustering</h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Utilizes density-based spatial clustering (DBSCAN) to identify hotspots of non-compliance across urban datasets.
+                </p>
+              </div>
+            </div>
+            {/* Card 2 */}
+            <div className="border border-outline-variant hover:border-primary-fixed-dim transition-all bg-surface-container overflow-hidden">
+              <div className="px-4 py-2 border-b border-outline-variant flex justify-between items-center text-[10px] bg-surface-container-high font-bold tracking-widest">
+                <span>[ FIG. 2 ]</span>
+                <span className="text-primary-fixed-dim">MODULE_PREDICT</span>
+              </div>
+              <div className="p-6">
+                <div className="w-10 h-10 border border-primary-fixed-dim/30 flex items-center justify-center mb-4 bg-primary-fixed-dim/5">
+                  <span className="material-symbols-outlined text-primary-fixed-dim text-lg">timeline</span>
+                </div>
+                <h3 className="text-sm font-bold mb-2">Risk Assessment</h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  High-accuracy XGBoost models trained on violation coordinates to predict upcoming space-time risk parameters.
+                </p>
+              </div>
+            </div>
+            {/* Card 3 */}
+            <div className="border border-outline-variant hover:border-primary-fixed-dim transition-all bg-surface-container overflow-hidden">
+              <div className="px-4 py-2 border-b border-outline-variant flex justify-between items-center text-[10px] bg-surface-container-high font-bold tracking-widest">
+                <span>[ FIG. 3 ]</span>
+                <span className="text-primary-fixed-dim">MODULE_ENFORCE</span>
+              </div>
+              <div className="p-6">
+                <div className="w-10 h-10 border border-primary-fixed-dim/30 flex items-center justify-center mb-4 bg-primary-fixed-dim/5">
+                  <span className="material-symbols-outlined text-primary-fixed-dim text-lg">gavel</span>
+                </div>
+                <h3 className="text-sm font-bold mb-2">Automated Pipeline</h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Direct integration with enforcer alerts and push messaging queues for predictive dispatch patrol runs.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
+
+      {/* Global Footer */}
+      <footer className="bg-surface-container-lowest border-t border-outline-variant py-6 px-6 font-mono text-[10px] tracking-wider text-on-surface-variant uppercase mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-2">
+          <span>© 2026 ENFORCEMENT INTEL. GLOBAL_SURVEILLANCE_NETWORK.</span>
+          <span>
+            LOCAL_TIME: <span id="clock" className="text-primary-fixed-dim font-bold">{time}</span> // LAT: 12.9716 N // LONG: 77.5946 E
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
