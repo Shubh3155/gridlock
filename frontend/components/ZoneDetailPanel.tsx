@@ -80,7 +80,7 @@ export default function ZoneDetailPanel({
             <div className="text-[9px] text-on-surface-variant mb-1 font-mono">
               [ FIG. {props.zone_id.replace("cluster_", "") || "00"} ]
             </div>
-            <h2 className="font-headline-lg text-lg font-bold text-primary-fixed-dim leading-none font-mono uppercase">
+            <h2 className="font-mono text-lg font-bold text-primary-fixed-dim leading-none uppercase">
               {props.zone_id}
             </h2>
             <p className="text-[10px] text-on-surface-variant mt-1 font-mono uppercase">

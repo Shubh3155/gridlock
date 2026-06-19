@@ -494,7 +494,7 @@ export default function LivePredictorPage() {
               <div className="col-span-12 lg:col-span-5 space-y-6">
                 
                 {/* Visual Radar Mock Map */}
-                <div className="border border-outline-variant bg-surface-container relative h-[240px] md:h-[260px] overflow-hidden">
+                <div className="border border-outline-variant bg-surface-container relative h-60 md:h-65 overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 p-2.5 bg-surface/85 backdrop-blur-sm z-20 flex justify-between items-center border-b border-outline-variant font-mono">
                     <span className="text-[9px] text-on-surface-variant font-bold">
                       [ MAP_COORD_VISUALIZER ]
@@ -538,7 +538,7 @@ export default function LivePredictorPage() {
                 </div>
 
                 {/* System Log Feed */}
-                <div className="border border-outline-variant bg-surface-container p-4 h-[256px] overflow-hidden flex flex-col font-mono">
+                <div className="border border-outline-variant bg-surface-container p-4 h-64 overflow-hidden flex flex-col font-mono">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-[10px] text-on-surface-variant font-bold">[ SYSTEM_LOG_FEED ]</span>
                     <div className="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></div>

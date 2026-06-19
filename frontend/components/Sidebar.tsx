@@ -25,7 +25,7 @@ export default function Sidebar({
   ];
 
   return (
-    <aside className="hidden md:flex flex-col bg-surface-container text-primary-fixed-dim font-mono-data uppercase border-r border-outline-variant h-full w-[280px] py-6 z-40">
+    <aside className="hidden md:flex flex-col bg-surface-container text-primary-fixed-dim font-mono-data uppercase border-r border-outline-variant h-full w-70 py-6 z-40">
       {/* Operator Status */}
       <div className="px-6 mb-6">
         <div className="flex items-center gap-3">

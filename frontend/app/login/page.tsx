@@ -116,8 +116,8 @@ export default function LoginPage() {
       </header>
 
       {/* Auth Gate Terminal Card */}
-      <main className="flex-grow flex items-center justify-center p-6 relative z-10 pt-20">
-        <div className="w-full max-w-[420px] font-mono">
+      <main className="grow flex items-center justify-center p-6 relative z-10 pt-20">
+        <div className="w-full max-w-105 font-mono">
           <div className="border border-outline-variant bg-surface-container shadow-2xl relative">
             
             {/* Window title header */}

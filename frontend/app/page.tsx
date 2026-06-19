@@ -222,7 +222,7 @@ export default function LandingPage() {
       </header>
 
       {/* Main operational Hero Body */}
-      <main className="flex-grow pt-24 max-w-7xl mx-auto w-full px-6 flex flex-col justify-center">
+      <main className="grow pt-24 max-w-7xl mx-auto w-full px-6 flex flex-col justify-center">
         <section className="py-16 md:py-24">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-8 flex flex-col justify-center">
@@ -274,7 +274,7 @@ export default function LandingPage() {
 
             {/* Right Terminal Visual Overlay */}
             <div className="lg:col-span-4 hidden lg:block relative font-mono">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-fixed-dim/5 to-transparent rounded-none"></div>
+              <div className="absolute inset-0 bg-linear-to-br from-primary-fixed-dim/5 to-transparent rounded-none"></div>
               <div className="border border-outline-variant p-4 h-full bg-surface-container-lowest/50 backdrop-blur-sm relative">
                 <div className="border-b border-outline-variant flex justify-between items-center px-4 py-2 mb-4 -mx-4 -mt-4 bg-surface-container-high">
                   <span className="text-[10px] text-on-surface-variant opacity-70">SYS_MONITOR_0.1</span>

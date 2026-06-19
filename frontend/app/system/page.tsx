@@ -460,7 +460,7 @@ export default function SystemPage() {
               
               {/* Left Column: Diagnostics monitor block */}
               <div className={user ? "col-span-12 lg:col-span-7" : "col-span-12 w-full max-w-xl mx-auto"}>
-                <div className="border border-outline-variant bg-surface-container p-4 relative min-h-[460px] flex flex-col justify-between">
+                <div className="border border-outline-variant bg-surface-container p-4 relative min-h-115 flex flex-col justify-between">
                   <div className="border-b border-outline-variant pb-2 mb-4 flex justify-between items-center bg-surface-container-high -mx-4 -mt-4 px-4 py-2">
                     <span className="text-[10px] text-primary-fixed-dim font-bold uppercase tracking-wider">
                       SYS_MONITOR_0.1 // {isPlaying ? "CONSOLE_DIAGNOSTIC_ACTIVE" : "CONSOLE_TELEMETRY"}
@@ -502,7 +502,7 @@ export default function SystemPage() {
                       ) : null}
 
                       {/* 20x20 Snake Board grid container */}
-                      <div className="w-[340px] h-[340px] md:w-[380px] md:h-[380px] grid grid-cols-20 grid-rows-20 border border-outline-variant bg-black/60 p-0.5">
+                      <div className="w-85 h-85 md:w-95 md:h-95 grid grid-cols-20 grid-rows-20 border border-outline-variant bg-black/60 p-0.5">
                         {gridCells}
                       </div>
 
@@ -512,7 +512,7 @@ export default function SystemPage() {
                     </div>
                   ) : (
                     /* Idle Diagnostic Console view showing telemetry logs */
-                    <div className="flex-grow flex flex-col justify-between py-12">
+                    <div className="grow flex flex-col justify-between py-12">
                       <div className="max-w-md mx-auto text-center space-y-4">
                         <div className="w-12 h-12 border border-primary-fixed-dim/30 flex items-center justify-center mx-auto bg-primary-fixed-dim/5 text-primary-fixed-dim animate-pulse">
                           <span className="material-symbols-outlined text-2xl">developer_board</span>
@@ -571,7 +571,7 @@ export default function SystemPage() {
                   </div>
 
                   {/* Log feed */}
-                  <div className="border border-outline-variant bg-surface-container p-4 h-[260px] overflow-hidden flex flex-col font-mono">
+                  <div className="border border-outline-variant bg-surface-container p-4 h-65 overflow-hidden flex flex-col font-mono">
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-[10px] text-on-surface-variant font-bold">[ TELEMETRY_STREAM ]</span>
                       <div className="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></div>

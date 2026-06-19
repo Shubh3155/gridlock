@@ -41,7 +41,7 @@ export default function StatsBar({ stats }: StatsBarProps) {
 
       <div className="flex items-center gap-2">
         <span className="text-on-surface-variant font-bold">PEAK_STATION:</span>
-        <span className="text-primary font-bold bg-surface-container-high px-2 py-0.5 border border-outline-variant max-w-[150px] truncate">
+        <span className="text-primary font-bold bg-surface-container-high px-2 py-0.5 border border-outline-variant max-w-37.5 truncate">
           {displayStats.top_station}
         </span>
       </div>

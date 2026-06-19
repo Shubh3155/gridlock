@@ -19,7 +19,7 @@ export default function Toast({
 }: ToastProps) {
   return (
     <div
-      className={`fixed top-20 right-6 z-[60] transform transition-all duration-300 font-mono ${
+      className={`fixed top-20 right-6 z-60 transform transition-all duration-300 font-mono ${
         visible ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"
       }`}
       id="toast"

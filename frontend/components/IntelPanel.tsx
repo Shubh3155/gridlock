@@ -102,7 +102,7 @@ export default function IntelPanel({
       </div>
 
       {/* Violation Breakdown Panel */}
-      <div className="p-4 border-b border-outline-variant min-h-[260px] flex flex-col justify-between">
+      <div className="p-4 border-b border-outline-variant min-h-65 flex flex-col justify-between">
         <div className="text-[11px] font-bold text-on-surface-variant tracking-wider font-mono mb-2">
           [ FIG. 02 ] VIOLATION_BREAKDOWN
         </div>
