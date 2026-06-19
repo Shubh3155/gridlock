@@ -291,13 +291,28 @@ function DashboardContent() {
   useEffect(() => {
     onForegroundMessage((payload) => {
       const zoneId = payload.data?.zone_id;
-      setToast({
-        visible: true,
-        title: payload.notification?.title || "🚨 HIGH RISK ALERT",
-        body: payload.notification?.body || "Critical hotspot violation probability detected.",
-        zoneId: zoneId,
-      });
-      addLog(`[ALERT] FCM Notification: ${payload.notification?.title}`);
+      
+      // Trigger a native browser desktop notification
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        const title = payload.notification?.title || "🚨 HIGH RISK ALERT";
+        const body = payload.notification?.body || "Critical hotspot violation probability detected.";
+        
+        const notification = new Notification(title, {
+          body: body,
+          icon: "/favicon.ico",
+        });
+        
+        notification.onclick = () => {
+          window.focus();
+          if (zoneId) {
+            setSelectedZoneId(zoneId);
+            setIsDetailPanelExpanded(true);
+            addLog(`[SYSTEM] Focus shifted to ${zoneId.toUpperCase()} from desktop alert.`);
+          }
+        };
+      }
+      
+      addLog(`[ALERT] FCM Desktop Notification: ${payload.notification?.title}`);
     });
   }, []);
 
@@ -427,12 +442,20 @@ function DashboardContent() {
       if (!firebaseUser) {
         addLog("[WARNING] No active Firebase operator session. Simulating alert dispatch...");
         setTimeout(() => {
-          setToast({
-            visible: true,
-            title: "🚨 MOCK ALERT: CRITICAL RISK DETECTED",
-            body: "UPPARPET PS (cluster_2) has critical activity: 67798 violations (Score: 10.0/10)",
-            zoneId: "cluster_2",
-          });
+          if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+            const notification = new Notification("🚨 MOCK ALERT: CRITICAL RISK DETECTED", {
+              body: "UPPARPET PS (cluster_2) has critical activity: 67798 violations (Score: 10.0/10)",
+              icon: "/favicon.ico",
+            });
+            notification.onclick = () => {
+              window.focus();
+              setSelectedZoneId("cluster_2");
+              setIsDetailPanelExpanded(true);
+              addLog("[SYSTEM] Focus shifted to CLUSTER_2 from mock desktop alert.");
+            };
+          } else {
+            alert("MOCK ALERT: UPPARPET PS (cluster_2) has critical activity: 67798 violations (Score: 10.0/10)");
+          }
           addLog("[ALERT] Mock alert dispatched to sector operators.");
         }, 1500);
         return;
