@@ -11,12 +11,13 @@
 | DBSCAN clustering | ✅ Done |
 | XGBoost violation likelihood model | ✅ Done |
 | Model evaluation (R² = 0.90, RMSE = 0.0763) | ✅ Done |
-| FastAPI backend | ✅ Done |
-| Next.js frontend | 🔲 Todo |
-| Firebase Auth (backend JWT verify + sessions) | ✅ Done |
-| FCM browser push (frontend integration) | 🔲 Todo |
-| Gemini enforcement brief | 🔲 Todo |
-| Deployment | 🔲 Todo |
+| FastAPI backend (Firestore + FCM dispatch) | ✅ Done |
+| Next.js frontend (Map + Sidebar + Form UI) | ✅ Done |
+| Firebase Auth & Session Tokens | ✅ Done |
+| Cloud Database Migration (Firestore zones) | ✅ Done |
+| Native Desktop Notifications (HTML5 + FCM) | ✅ Done |
+| Gemini enforcement brief (with Firestore cache) | ✅ Done |
+| Deployment (Production-ready) | 🔲 Todo / Optional |
 
 ---
 
@@ -106,13 +107,15 @@ backend/
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| GET | `/api/zones` | Public | All DBSCAN zones as GeoJSON with priority scores |
-| GET | `/api/zones/{zone_id}` | Public | Single zone detail + AI brief |
+| GET | `/api/zones` | Public | All DBSCAN zones streamed from Firestore with priority scores (falls back to local geojson) |
+| GET | `/api/zones/{zone_id}` | Public | Single zone detail + AI brief (caches brief to Firestore) |
+| POST | `/api/zones/{zone_id}/violations` | Public | Register a new infraction (increments count, recalibrates priority score in Firestore) |
 | GET | `/api/heatmap/historical` | Public | Raw violation points for heatmap |
 | GET | `/api/heatmap/predicted` | Public | Precomputed prediction grid |
 | GET | `/api/stats` | Public | Dashboard summary (total violations, top station, peak hour) |
 | POST | `/api/predict` | Public | Predict likelihood for a given lat/lng/hour/day |
-| POST | `/api/register-fcm-token` | 🔒 JWT | Store FCM token for logged-in user |
+| POST | `/api/register-fcm-token` | 🔒 JWT | Store FCM token and assign operator to police station sector |
+| POST | `/api/alert/dispatch` | 🔒 JWT | Dispatch FCM push message to enforcers of the highest violation zone |
 | POST | `/api/run-pipeline` | 🔒 Admin | Re-run clustering + model inference on new data |
 
 ### Auth Middleware
@@ -207,6 +210,27 @@ async def serve_sw():
 ```
 
 > ⚠️ The service worker **must** be served from the root path. In Next.js, place it in `/public/firebase-messaging-sw.js` — Next.js serves `/public` at root automatically, so FastAPI doesn't need to serve it in production.
+
+### Firestore Cloud Integration & Array Serialization
+
+To bypass Google Firestore's nested array limitation (which prevents uploading multi-dimensional coordinate arrays representing GeoJSON polygons e.g., `[[[lng, lat], ...]]]`), the backend automatically serializes the `geometry` object of each zone into a JSON string on write:
+```python
+doc_data = json.loads(json.dumps(feature))
+if "geometry" in doc_data:
+    doc_data["geometry"] = json.dumps(doc_data["geometry"])
+```
+
+When fetching or streaming from Firestore, the data loader deserializes the JSON string back into a standard GeoJSON geometry object before returning it to the frontend.
+
+#### Lifespan Startup Migration Check
+During FastAPI server startup, the application checks if the Firestore `zones` collection contains any documents. If empty, the local `pipeline/output/zones.geojson` database is automatically parsed and its 331 zones are bulk-uploaded in batch writes of 400 features at a time. This guarantees instant, zero-configuration cloud database populating upon first run.
+
+### Dispatch Alert & Native Browser Focus Action
+
+Operators can trigger a high infraction push alert targeting the area with the highest violation count via the `[ SEND ALERT ]` sidebar button:
+1. **Multicast Messaging**: The backend finds the highest violation zone, maps it to its assigned police station, queries all enforcers/operators assigned to that station in Firestore, and sends a multicast FCM push notification containing the `zone_id` metadata.
+2. **HTML5 Notification API**: When received in the foreground, the frontend uses the browser's native `Notification` API to pop up a native desktop banner instead of a standard React Toast.
+3. **Refocus/Centering Click Handler**: Clicking the notification triggers `window.focus()` to bring the tab into focus, highlights the corresponding zone ID on the Leaflet map, and slides open the detailed information inspector panel.
 
 ---
 
@@ -486,17 +510,15 @@ Set all `NEXT_PUBLIC_*` env vars in Vercel dashboard. Update `NEXT_PUBLIC_API_UR
 8. Click notification → app focuses, highlights that zone
 ```
 
----
-
 ## Remaining Timeline
 
-| Time | Task |
-|---|---|
-| Next 1–2 hrs | Phase 1: SHAP + confidence tiers + prediction grid export |
-| Next 3–4 hrs | Phase 2: FastAPI all routes + FCM push wired |
-| Next 4–5 hrs | Phase 3: Next.js dashboard + map + Firebase Auth + FCM |
-| Next 1 hr | Phase 4: Gemini brief endpoint + Firestore cache |
-| Final 1 hr | Phase 5: Deploy to Render + Vercel, smoke test end-to-end |
+| Phase | Task | Status |
+|---|---|---|
+| Phase 1 | SHAP + confidence tiers + prediction grid export | ✅ Completed |
+| Phase 2 | FastAPI all routes + FCM push + Firestore Integration | ✅ Completed |
+| Phase 3 | Next.js dashboard + map + Firebase Auth + Native Alerts + Infraction Form | ✅ Completed |
+| Phase 4 | Gemini brief endpoint + Firestore cache | ✅ Completed |
+| Phase 5 | Deploy to Render + Vercel, smoke test end-to-end | 🔲 Optional / Pending Deployment |
 
 ---
 

@@ -20,8 +20,8 @@ graph TD
 ```
 
 1. **The Machine Learning Pipeline (`/pipeline`)**: Clean raw datasets, perform spatial clustering, engineer temporal/spatial features, and train the predictive models.
-2. **FastAPI Backend (`/backend`)**: Serve precomputed spatial hotspots, run real-time inference on the XGBoost regressor, manage sessions, and coordinate Firebase integrations.
-3. **Next.js Frontend (`/frontend`)**: A high-performance responsive web dashboard featuring Leaflet map layers, dynamic heatmap toggling (historical vs. predicted), detailed hotspot inspector sidebars, and Google Authentication.
+2. **FastAPI Backend (`/backend`)**: Serves precomputed spatial hotspots from Firestore, runs real-time inference on the XGBoost regressor, manages operator sessions, and handles FCM push alert dispatches.
+3. **Next.js Frontend (`/frontend`)**: A high-performance, responsive web dashboard featuring Leaflet map layers, dynamic heatmap toggling, detailed hotspot inspector sidebars, interactive violation logging forms, and Google Authentication.
 
 ---
 
@@ -133,14 +133,16 @@ The API will start running on [http://localhost:8000](http://localhost:8000) and
 | :--- | :---: | :---: | :--- |
 | `/` | `GET` | Public | Health check / Welcome status |
 | `/api/stats` | `GET` | Public | Fetch overall statistics (total violations, peak hours, risk average) |
-| `/api/zones` | `GET` | Public | GeoJSON FeatureCollection of DBSCAN priority zones |
-| `/api/zones/{zone_id}` | `GET` | Public | Detail payload for a specific zone including coordinates and metrics |
+| `/api/zones` | `GET` | Public | Stream GeoJSON FeatureCollection of DBSCAN priority zones from Firestore |
+| `/api/zones/{zone_id}` | `GET` | Public | Detail payload for a specific zone including coordinates, metrics, and AI brief |
+| `/api/zones/{zone_id}/violations` | `POST` | Public | Register a new violation in Firestore (recalculates risk score and increments count) |
 | `/api/heatmap/historical`| `GET` | Public | Downsampled raw coordinates for rendering the historical heatmap |
 | `/api/heatmap/predicted` | `GET` | Public | Spatial coordinates grid populated with XGBoost likelihood predictions |
 | `/api/predict` | `POST` | Public | Real-time predictive inference for a single coordinate & hour |
 | `/api/auth/verify` | `POST` | Public | Verify Firebase client ID token and register user session |
 | `/api/auth/logout` | `POST` | 🔒 JWT (Bearer) | Terminate current user session |
-| `/api/register-fcm-token`| `POST`| 🔒 JWT (Bearer) | Save browser push notification token under user's profile |
+| `/api/register-fcm-token`| `POST`| 🔒 JWT (Bearer) | Save browser push notification token under user's profile and assign station |
+| `/api/alert/dispatch` | `POST`| 🔒 JWT (Bearer) | Multicast FCM push alerts to operators assigned to the highest violation zone |
 
 ---
 
@@ -163,6 +165,48 @@ Predicts space-time violation density ($0.0 \rightarrow 1.0$) using a set of eng
 *   `is_peak_hour` (weighted peak travel window hours)
 *   `violation_weight` (severity weights based on violation types)
 *   `police_station_load` & `is_near_commercial` (traffic draw proxies)
+
+## ☁️ Cloud Data Migration & Geometry Workaround
+
+To support real-time shared updates across all operator screens, the application's underlying zone database was migrated from the local `zones.geojson` asset to **Google Firestore** (collection: `zones`).
+
+### 1. Geometry Serialization Workaround
+Firestore restricts storing multi-dimensional arrays (such as GeoJSON coordinates for nested polygons like `[[[lng, lat], ...]]]`). To bypass this limitation:
+* **Write / Serialization**: The backend serializes the GeoJSON `geometry` property into a standard JSON string before storing the zone document.
+* **Read / Deserialization**: The in-memory data loader fetches the zone collection, parses the geometry JSON string back into objects, and streams a valid GeoJSON FeatureCollection to the client.
+
+### 2. Auto-Migration Lifespan Hook
+During FastAPI startup, the application verifies if the Firestore `zones` collection contains documents. If it is empty, the server automatically reads the local `pipeline/output/zones.geojson` backup and batch-uploads all 331 zones to Firestore.
+
+---
+
+## 🔔 Native Operator Alerts & Desktop Notifications
+
+Rather than using inline Web-Toast popups that are easily missed when working across multiple browser windows, Gridlock is integrated with native OS-level desktop notifications.
+
+### 1. Permission Prompt & Subscription
+Upon logging in, enforcers are prompted to grant browser notification permissions. If approved, their FCM token is saved under their Firestore user profile, and they are dynamically assigned to a local police station sector.
+
+### 2. Operator Alert Dispatch (`/api/alert/dispatch`)
+When an operator triggers a push dispatch:
+1. The backend determines the highest infraction zone (maximum `violation_count`).
+2. It resolves the zone to its corresponding police station sector.
+3. It queries Firestore for all active enforcers/operators assigned to that specific station and broadcasts a multicast FCM payload.
+
+### 3. Click Refocus & Interactive Map Centering
+If a native notification banner is clicked, a custom listener fires:
+* It forces browser tab focus via `window.focus()`.
+* It extracts the `zone_id` from the notification's payload.
+* It highlights and selects the target zone on the Leaflet map overlay.
+* It slides out the detailed zone inspection panel containing the violation breakdown and SHAP explainability charts.
+
+---
+
+## 📋 Interactive Infraction Registration Form
+
+On the **System Logs** page, operators can log new parking and traffic infractions in real-time.
+* **Firestore Data Persistence**: Submitting the form posts to `/api/zones/{zone_id}/violations` which directly increments the zone's violation count and updates its priority ranking in Firestore.
+* **Hotspot Overlay Synchronization**: When a violation is added, the backend cache is invalidated, and the Leaflet map overlays are automatically re-rendered to reflect the updated statistics.
 
 ---
 
