@@ -196,7 +196,7 @@ export default function DocumentationPage() {
                 NETWORK VISUALIZER
               </h3>
               <p className="opacity-85">
-                Displays real-time Leaflet GIS overlays containing DBSCAN-constructed hotspots. Features a **`[ SEND ALERT ]`** control button in the Left Sidebar that resolves the highest violation area and sends a multicast FCM push notification to all sector operators. Requires authorization.
+                Displays real-time Leaflet GIS overlays containing DBSCAN-constructed hotspot polygons. Renders historical violation densities and XGBoost predicted likelihood maps with interactive detail panels. Requires operator session.
               </p>
             </div>
 
@@ -216,7 +216,27 @@ export default function DocumentationPage() {
                 TELEMETRY & REGISTRY
               </h3>
               <p className="opacity-85">
-                Provides central operations logging, buffer clearing, and ML stats. Features an interactive **`[ REGISTER_NEW_INFRACTION ]`** submission form that writes directly to the Firestore cloud database, updating priority scores on the map overlay dynamically. Requires operator session.
+                Provides central operations logging, buffer clearing, and ML stats. Houses historical system logs, telemetry database metrics, and performance charts. Requires operator session.
+              </p>
+            </div>
+
+            <div className="border border-outline-variant/60 p-4 bg-surface-container-low">
+              <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm text-primary-fixed-dim">notifications_active</span>
+                OPERATOR DISPATCH (SEND ALERT)
+              </h3>
+              <p className="opacity-85 leading-relaxed">
+                Clicking the **`[ SEND ALERT ]`** sidebar action queries the zone with the highest infraction count, identifies the responsible sector station, and triggers an FCM multicast push. Active operators receive a native OS-level desktop notification; clicking it focuses the window, centers the map, and opens the zone's details.
+              </p>
+            </div>
+
+            <div className="border border-outline-variant/60 p-4 bg-surface-container-low">
+              <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm text-primary-fixed-dim">post_add</span>
+                INFRACTION REGISTRATION
+              </h3>
+              <p className="opacity-85 leading-relaxed">
+                An interactive submission form on the Logs page allowing operators to register new infractions (violation type, severity weight) for a specific zone. Submitting sends a POST request that updates Firestore in real-time, recalculating priority scores and forcing map overlay sync.
               </p>
             </div>
 

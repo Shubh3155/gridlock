@@ -80,7 +80,7 @@ function NavbarContent({
             <span className="text-primary-fixed-dim font-bold">&gt;</span>
             <input
               className="bg-transparent border-none outline-none focus:ring-0 text-xs font-mono w-32 placeholder:text-on-surface-variant/40 text-foreground"
-              placeholder="TYPE SNAKE"
+              placeholder="[ CMD: SNAKE ]"
               type="text"
               value={cmdValue}
               onChange={(e) => onCmdChange(e.target.value)}
